@@ -1,1 +1,5 @@
 .env
+
+# local start files
+node_modules
+*json
