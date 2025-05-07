@@ -36,6 +36,7 @@ create table student (
     faculty_id integer not null,
     foreign key (faculty_id) references faculties(faculty_id) on delete restrict,
     group_number integer not null
+    course integer not null
 ) inherits (categories);
 
 create table teacher (

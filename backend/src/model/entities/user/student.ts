@@ -10,4 +10,7 @@ export class Student extends User {
 
   @Column('int')
   groupNumber!: number;
+
+  @Column('int')
+  course!: number;
 }
