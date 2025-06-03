@@ -76,7 +76,6 @@ create table books (
     admission_date date not null,
     lost_date date,
     cost integer not null check (cost > 0),
-    from_another_lib boolean
 );
 
 create table offences (
@@ -97,6 +96,7 @@ create table point_types (
 create table reading_points (
     point_id serial primary key not null unique,
     type_id integer not null,
+    address text not null,
     foreign key (type_id) references point_types(type_id) on delete restrict
 );
 
@@ -125,4 +125,12 @@ create table rented_books (
     expired_date date not null,
     status_id integer not null,
     foreign key (status_id) references statuses(status_id) on delete restrict
+);
+
+create table orders (
+    primary key book_id,
+    book_id integer not null,
+    foreign key (book_id) references books(book_id) on delete cascade,
+    phone_number string not null,
+    order_date date not null
 );

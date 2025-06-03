@@ -15,6 +15,7 @@ import { Status } from "./entities/books/status";
 import { PointType } from "./entities/points/point_type";
 import { PointUser } from "./entities/points/point_user";
 import { ReadingPoint } from "./entities/points/reading_point";
+import { Orders } from "./entities/books/orders";
 
 export const UserDataSource = new DataSource({
     type: "postgres",
@@ -42,7 +43,7 @@ export const BookDataSource = new DataSource({
     synchronize: false,
     logging: true,
     entities: [
-        Book, RentedBook, Status
+        Book, RentedBook, Status, Orders
     ]
 })
 

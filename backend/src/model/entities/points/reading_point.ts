@@ -1,4 +1,4 @@
-import { Entity, JoinColumn, JoinTable, ManyToMany, ManyToOne, OneToMany, PrimaryGeneratedColumn } from "typeorm";
+import { Column, Entity, JoinColumn, JoinTable, ManyToMany, ManyToOne, OneToMany, PrimaryGeneratedColumn } from "typeorm";
 import { PointType } from "./point_type";
 import { Book } from "../books/book";
 import { RentedBook } from "../books/rented_book";
@@ -11,6 +11,9 @@ export class ReadingPoint {
     @ManyToOne(() => PointType)
     @JoinColumn({ name: 'typeId' })
     type!: PointType;
+
+    @Column()
+    address: string;
 
     @ManyToMany(() => Book)
     @JoinTable()

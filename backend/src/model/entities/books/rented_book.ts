@@ -9,17 +9,17 @@ export class RentedBook {
     @PrimaryColumn()
     @ManyToOne(() => User)
     @JoinColumn({ name: 'userId' })
-    user!: User;
+    user!: number;
 
     @PrimaryColumn()
     @ManyToOne(() => Book)
     @JoinColumn({ name: 'bookId' })
-    book!: Book;
+    book!: number;
 
     @PrimaryColumn()
     @ManyToOne(() => ReadingPoint)
     @JoinColumn({ name: 'pointId' })
-    point!: ReadingPoint;
+    point!: number;
 
     @Column({ type: 'date', nullable: true })
     rentedDate!: Date;
