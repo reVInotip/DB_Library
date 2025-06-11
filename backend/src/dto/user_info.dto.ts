@@ -37,3 +37,11 @@ export class ReadersWithCountDto {
   readers: User[];
   totalCount: number;
 }
+
+export class PointUserSearchCriteria {
+    userId?: number;
+    pointId?: number;
+    minRegisterDate?: Date;
+    maxRegisterDate?: Date;
+    isActive?: boolean; // Если eliminationDate null
+}

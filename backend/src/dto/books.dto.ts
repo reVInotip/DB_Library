@@ -62,3 +62,15 @@ export class BookSearchCriteria {
     fromAnotherLib?: boolean;
     isLost?: boolean;
 }
+
+export class RentedBookSearchCriteria {
+    userId?: number;
+    bookId?: number;
+    pointId?: number;
+    statusId?: number;
+    minRentedDate?: Date;
+    maxRentedDate?: Date;
+    minExpiredDate?: Date;
+    maxExpiredDate?: Date;
+    isExpired?: boolean;
+}

@@ -4,6 +4,7 @@ import manager, { SessionManager } from '../../model/session.manager';
 import { AuthRequest } from '../auth/auth_request';
 import { AdminSession } from '../../model/session/admin.session';
 import { ISession } from '../../model/session/session.interface';
+import { SuperuserSession } from '../../model/session/superuser.asession';
 
 export class UserController {
     private sessionManager: SessionManager;
@@ -15,9 +16,11 @@ export class UserController {
     private checkAvailableRoles(session: ISession): number {
         if (session.role == 'admin') {
             return 0;
+        } else if (session.role == 'worker') {
+            return 1;
         }
 
-        return 1;
+        return 2;
     }
 
     async create(req: AuthRequest, res: Response) {
@@ -42,6 +45,10 @@ export class UserController {
     }
 
     async getAll(req: AuthRequest, res: Response) {
+        if (this.checkAvailableRoles(req.session) > 1) {
+            return res.status(401).json({ message: 'Access denied' });
+        }
+
         try {
             const adminSession = <AdminSession> req.session;
             const users = await adminSession.getAllUsers();
@@ -54,6 +61,10 @@ export class UserController {
     }
 
     async getBySomething(req: AuthRequest, res: Response) {
+        if (this.checkAvailableRoles(req.session) > 1) {
+            return res.status(401).json({ message: 'Access denied' });
+        }
+
         try {
             const adminSession = <AdminSession> req.session;
             const user = await adminSession.findUser(req.body);
@@ -71,6 +82,10 @@ export class UserController {
     }
 
     async update(req: AuthRequest, res: Response) {
+        if (this.checkAvailableRoles(req.session) > 0) {
+            return res.status(401).json({ message: 'Access denied' });
+        }
+
         try {
             const id = parseInt(req.params.id);
             const adminSession = <AdminSession> req.session;
@@ -89,6 +104,10 @@ export class UserController {
     }
 
     async delete(req: AuthRequest, res: Response) {
+        if (this.checkAvailableRoles(req.session) > 0) {
+            return res.status(401).json({ message: 'Access denied' });
+        }
+
         try {
             const id = parseInt(req.params.id);
             const adminSession = <AdminSession> req.session;
@@ -102,6 +121,27 @@ export class UserController {
         } catch (error) {
             res.status(500).json({
                 message: error instanceof Error ? error.message : 'User deletion error'
+            });
+        }
+    }
+
+    async getDebtors(req: AuthRequest, res: Response) {
+        if (this.checkAvailableRoles(req.session) > 1) {
+            return res.status(401).json({ message: 'Access denied' });
+        }
+
+        try {
+            const session = <SuperuserSession> req.session;
+            const result = await session.getDebtors(req.body);
+
+            if (result == null) {
+                return res.status(400).json({ message: 'Get debtors failed' });
+            }
+            
+            res.json(result);
+        } catch (error) {
+            res.status(500).json({
+                message: error instanceof Error ? error.message : 'get debtors error'
             });
         }
     }

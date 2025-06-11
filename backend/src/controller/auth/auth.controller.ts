@@ -12,6 +12,7 @@ export class AuthController {
         this.authenticateJWT = this.authenticateJWT.bind(this);
         this.registerUser = this.registerUser.bind(this);
         this.authenticatePassword = this.authenticatePassword.bind(this);
+        this.authHook = this.authHook.bind(this);
     }
     
     async authenticateJWT(req: AuthRequest, res: Response, next: NextFunction) {
@@ -41,19 +42,16 @@ export class AuthController {
 
     async authHook(req: AuthRequest, res: Response, next: NextFunction) {
         const authHeader = req.headers.authorization;
-
-        if (!authHeader || !authHeader.startsWith('Bearer ')) {
-            res.status(401).json({ message: 'No token provided' }).send();
-            return;
-        }
-
-        const token = authHeader.split(' ')[1];
-
         try {
-            let session: ISession = this.sessionManager.getSession(token);
-
-            if (!session) {
+            let session: ISession;
+            if (!authHeader || !authHeader.startsWith('Bearer ')) {
                 session = this.sessionManager.createUnauthSession();
+            } else {
+                const token = authHeader.split(' ')[1];
+                session = this.sessionManager.getSession(token);
+                if (!session) {
+                    session = this.sessionManager.createUnauthSession();
+                }
             }
 
             req.session = session;

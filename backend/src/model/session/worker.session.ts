@@ -1,4 +1,4 @@
-import { AuthorizedSession, BaseSession, SuperuserSession } from "./session.interface";
+import { SuperuserSession } from "./superuser.asession";
 
 export class WorkerSession extends SuperuserSession {
     constructor(userId: number, token: string, expiresAt: Date) {

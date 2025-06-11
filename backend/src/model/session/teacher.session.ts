@@ -1,4 +1,4 @@
-import { AuthorizedSession, BaseSession } from './session.interface';
+import { AuthorizedSession } from "./authorized.assession";
 
 export class TeacherSession extends AuthorizedSession {
     constructor(userId: number, token: string, expiresAt: Date) {

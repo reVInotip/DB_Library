@@ -5,6 +5,7 @@ import { AuthRequest } from '../auth/auth_request';
 import { AdminSession } from '../../model/session/admin.session';
 import { ISession } from '../../model/session/session.interface';
 import { UnauthorizedSession } from '../../model/session/unauth.session';
+import { SuperuserSession } from '../../model/session/superuser.asession';
 
 export class ReadingPointController {
     private sessionManager: SessionManager;
@@ -16,6 +17,8 @@ export class ReadingPointController {
     private checkAvailableRoles(session: ISession): number {
         if (session.role == 'admin') {
             return 0;
+        } else if (session.role == 'worker') {
+            return 1;
         }
 
         return 1;
@@ -67,10 +70,6 @@ export class ReadingPointController {
     }
 
     async getById(req: AuthRequest, res: Response) {
-        if (this.checkAvailableRoles(req.session) > 0) {
-            return res.status(401).json({ message: 'Access denied' });
-        }
-
         const session = req.session;
         const result = await session.getReadingPointById(Number.parseInt(req.params.id));
         if (result == null) {
@@ -82,6 +81,10 @@ export class ReadingPointController {
     }
 
     async update(req: AuthRequest, res: Response) {
+        if (this.checkAvailableRoles(req.session) > 0) {
+            return res.status(401).json({ message: 'Access denied' });
+        }
+
         try {
             const id = parseInt(req.params.id);
             const adminSession = <AdminSession> req.session;
@@ -100,19 +103,44 @@ export class ReadingPointController {
     }
 
     async delete(req: AuthRequest, res: Response) {
+        if (this.checkAvailableRoles(req.session) > 0) {
+            return res.status(401).json({ message: 'Access denied' });
+        }
+
         try {
             const id = parseInt(req.params.id);
             const adminSession = <AdminSession> req.session;
             const result = await adminSession.deleteReadingPoint(id);
             
             if (result !== 0) {
-                return res.status(400).json({ message: 'Title deletion failed' });
+                return res.status(400).json({ message: 'Reading point deletion failed' });
             }
             
-            res.json({ message: 'Title deleted successfully' });
+            res.json({ message: 'Reading point deleted successfully' });
         } catch (error) {
             res.status(500).json({
-                message: error instanceof Error ? error.message : 'Title deletion error'
+                message: error instanceof Error ? error.message : 'Reding point deletion error'
+            });
+        }
+    }
+
+    async getReadersByReadingPoint(req: AuthRequest, res: Response) {
+        if (this.checkAvailableRoles(req.session) > 1) {
+            return res.status(401).json({ message: 'Access denied' });
+        }
+
+        try {
+            const session = <SuperuserSession> req.session;
+            const result = await session.getReadersByReadingPoint(Number.parseInt(req.params.id), req.body);
+
+            if (result == null) {
+                return res.status(400).json({ message: 'Get failed' });
+            }
+            
+            res.json(result);
+        } catch (error) {
+            res.status(500).json({
+                message: error instanceof Error ? error.message : 'Get error'
             });
         }
     }

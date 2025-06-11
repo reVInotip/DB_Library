@@ -1,8 +1,9 @@
 import { Response } from 'express';
 import manager, { SessionManager } from '../../model/session.manager';
 import { AuthRequest } from '../auth/auth_request';
-import { AdminSession } from '../../model/session/admin.session';
-import { AuthorizedSession, ISession, SuperuserSession } from '../../model/session/session.interface';
+import { ISession } from '../../model/session/session.interface';
+import { SuperuserSession } from '../../model/session/superuser.asession';
+import { AuthorizedSession } from '../../model/session/authorized.assession';
 
 export class BookController {
     private sessionManager: SessionManager;

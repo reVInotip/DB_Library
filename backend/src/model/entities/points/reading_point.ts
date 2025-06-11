@@ -20,9 +20,9 @@ export class ReadingPoint {
     @JoinTable()
     books: Book[];
 
-    @OneToMany(() => RentedBook, rentedBook => rentedBook.book)
+    @OneToMany(() => RentedBook, rentedBook => rentedBook.book, { nullable: true })
     rentedBooks?: RentedBook[];
 
-    @OneToMany(() => PointUser, point => point.user)
+    @OneToMany(() => PointUser, point => point.user, { nullable: true })
     users?: PointUser[];
 }

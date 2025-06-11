@@ -4,7 +4,7 @@ export class DebtorFilterDto {
     department?: string;
     course?: number;
     group?: number;
-    category?: string;
+    minOverdueDays?: number;
 }
 
 export class DebtorResultDto {

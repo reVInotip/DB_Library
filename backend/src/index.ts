@@ -4,6 +4,7 @@ import cors from 'cors';
 import morgan from "morgan";
 import http from 'http';
 import userRouter from "./routers/user.router";
+import bookRouter from "./routers/books.router";
 import readingPointsRouter from "./routers/reading_points.router";
 import manager from "./model/session.manager";
 import AppDataSource from "./model/data-source";
@@ -31,7 +32,7 @@ app.use(express.urlencoded({extended: true}));
 
 app.use('/user', userRouter);
 app.use('/readingPoints', readingPointsRouter);
-//app.use('/books');
+app.use('/books', bookRouter);
 
 app.set('port', 8080);
 

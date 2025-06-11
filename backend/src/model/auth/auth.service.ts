@@ -36,7 +36,7 @@ export class AuthService {
         }
 
         let result: InsertResult;
-        if (user instanceof TeacherDto) {
+        if (role.roleName == 'teacher') {
             const teacher = <TeacherDto> user;
             const degree = await AppDataSource.getRepository(ScientificDegree).findOneBy({degreeId: teacher.degreeId});
             const department = await AppDataSource.getRepository(Department).findOneBy({departmentId: teacher.departmentId});
@@ -58,7 +58,7 @@ export class AuthService {
                     scientificDegree: degree,
                     title: title
             });
-        } else if (user instanceof StudentDto) {
+        } else if (role.roleName == 'student') {
             const student = <StudentDto> user;
             const faculty = await AppDataSource.getRepository(Faculty).findOneBy({facultyId: student.facultyId});
 
@@ -80,7 +80,7 @@ export class AuthService {
             })
         }
 
-        if (result.identifiers == null) {
+        if (result == null || result.identifiers == null) {
             return null;
         }
 

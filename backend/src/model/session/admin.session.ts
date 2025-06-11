@@ -10,13 +10,13 @@ import { Role } from "../entities/user/role";
 import { ScientificDegree } from "../entities/user/scientific_degree";
 import { Title } from "../entities/user/title";
 import { User } from "../entities/user/user";
-import { AuthorizedSession, BaseSession, SuperuserSession } from "./session.interface";
 import { Teacher } from "../entities/user/teacher";
 import * as bcrypt from 'bcryptjs';
 import { Student } from "../entities/user/student";
 import { adminRoleName, workerRoleName } from "../session.manager";
 import { ReadingPoint } from "../entities/points/reading_point";
 import { Book } from "../entities/books/book";
+import { SuperuserSession } from "./superuser.asession";
 
 export class AdminSession extends SuperuserSession {
     private authService: AuthService;
@@ -49,7 +49,7 @@ export class AdminSession extends SuperuserSession {
                 passwordHash: await bcrypt.hash(userData.password, 5)
             };
 
-            if (userData instanceof TeacherDto) {
+            if (role.roleName == 'teacher') {
                 const teacher = userData as TeacherDto;
                 const [degree, department, title] = await Promise.all([
                     this.find(ScientificDegree, { degreeId: teacher.degreeId }),
@@ -66,7 +66,7 @@ export class AdminSession extends SuperuserSession {
                     title
                 });
             } 
-            else if (userData instanceof StudentDto) {
+            else if (role.roleName == 'student') {
                 const student = userData as StudentDto;
                 const faculty = await this.find(Faculty, { facultyId: student.facultyId });
                 if (!faculty) return 1;
@@ -103,7 +103,7 @@ export class AdminSession extends SuperuserSession {
                 passwordHash: await bcrypt.hash(userData.password, 5)
             };
 
-            if (userData instanceof TeacherDto) {
+            if (role.roleName == 'teacher') {
                 const teacher = userData as TeacherDto;
                 const [degree, department, title] = await Promise.all([
                     this.find(ScientificDegree, { degreeId: teacher.degreeId }),
@@ -120,7 +120,7 @@ export class AdminSession extends SuperuserSession {
                     title
                 });
             } 
-            else if (userData instanceof StudentDto) {
+            else if (role.roleName == 'student') {
                 const student = userData as StudentDto;
                 const faculty = await this.find(Faculty, { facultyId: student.facultyId });
                 if (!faculty) return 1;
@@ -292,7 +292,7 @@ export class AdminSession extends SuperuserSession {
 
     // Методы для работы с пользователями
     async getAllUsers(): Promise<User[]> {
-        return this.getAll(User, ['rentedBooks', 'points']);
+        return this.getAll(User);
     }
 
     async findUser(userDto: UserDto): Promise<User | null> {

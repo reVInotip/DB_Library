@@ -42,6 +42,8 @@ router.get('/faculty/:facultyName', authController.authenticateJWT, facultyContr
 router.put('/faculty/:id', authController.authenticateJWT, facultyController.update.bind(facultyController));
 router.delete('/faculty/:id', authController.authenticateJWT, facultyController.delete.bind(facultyController));
 
+router.put('/debtors', authController.authenticateJWT, userController.getDebtors.bind(userController));
+
 router.post('/', authController.authenticateJWT, userController.create.bind(userController));
 router.get('/', authController.authenticateJWT, userController.getAll.bind(userController));
 router.put('/', authController.authenticateJWT, userController.getBySomething.bind(userController));

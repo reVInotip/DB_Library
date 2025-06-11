@@ -1,7 +1,5 @@
 import { InsertResult } from 'typeorm';
 import AppDataSource from '../data-source';
-import { UserInfoDto } from '../../dto/user_info.dto';
-import { AuthorizedSession, BaseSession } from './session.interface';
 import { Book } from '../entities/books/book';
 import { RentedBook } from '../entities/books/rented_book';
 import { User } from '../entities/user/user';
@@ -9,6 +7,7 @@ import { BookWithReadingPointDto } from '../../dto/books.dto';
 import { ReadingPoint } from '../entities/points/reading_point';
 import { PointType } from '../entities/points/point_type';
 import { Orders } from '../entities/books/orders';
+import { AuthorizedSession } from './authorized.assession';
 
 export class StudentSession extends AuthorizedSession {
     constructor(userId: number, token: string, expiresAt: Date) {

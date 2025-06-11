@@ -1,4 +1,4 @@
-import { AuthorizedSession, RoleType } from './session/session.interface';
+import { RoleType } from './session/session.interface';
 import { AuthService } from './auth/auth.service';
 import { User } from './entities/user/user';
 import { StudentSession } from './session/student.session';
@@ -9,6 +9,7 @@ import { Student } from './entities/user/student';
 import { Teacher } from './entities/user/teacher';
 import { WorkerSession } from './session/worker.session';
 import { UnauthorizedSession } from './session/unauth.session';
+import { AuthorizedSession } from './session/authorized.assession';
 
 export const adminRoleName: RoleType = "admin";
 export const workerRoleName: RoleType = 'worker';
@@ -26,6 +27,12 @@ export class SessionManager {
         // create init admin session
         const initSession: AdminSession = this.createInitSession();
         await initSession.createRole(adminRoleName);
+
+        const users = await initSession.getAllUsers();
+
+        if (users && users.length != 0) {
+            return;
+        }
 
         const role = await initSession.findRole(adminRoleName);
         const result = await initSession.createUser({
