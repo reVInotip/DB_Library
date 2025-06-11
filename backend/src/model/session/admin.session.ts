@@ -12,7 +12,7 @@ import { Title } from "../entities/user/title";
 import { User } from "../entities/user/user";
 import { BaseSession } from "./session.interface";
 import { Teacher } from "../entities/user/teacher";
-import bcrypt from "bcryptjs/umd/types";
+import * as bcrypt from 'bcryptjs';
 import { Student } from "../entities/user/student";
 import { adminRoleName, workerRoleName } from "../session.manager";
 
@@ -27,578 +27,281 @@ export class AdminSession extends BaseSession {
     destroy(): Promise<void> {
         throw new Error("Method not implemented.");
     }
-    
+
     refresh(): Promise<void> {
         throw new Error("Method not implemented.");
     }
 
+    // Специфичные методы для пользователей
     async createUser(userData: UserDto): Promise<number> {
         try {
-            const role = await AppDataSource.getRepository(Role).findOneBy({roleId: userData.roleId});
-            if (!role) {
-                return 1;
-            }
+            const role = await this.find(Role, { roleId: userData.roleId });
+            if (!role) return 1;
 
-            let result: InsertResult;
+            const commonData = {
+                username: userData.name,
+                userSecondName: userData.secondName,
+                userPatronymic: userData.patronymic,
+                email: userData.email,
+                role: role,
+                passwordHash: await bcrypt.hash(userData.password, 5)
+            };
+
             if (userData instanceof TeacherDto) {
-                const teacher = <TeacherDto> userData;
-                const degree = await AppDataSource.getRepository(ScientificDegree).findOneBy({degreeId: teacher.degreeId});
-                const department = await AppDataSource.getRepository(Department).findOneBy({departmentId: teacher.departmentId});
-                const title = await AppDataSource.getRepository(Title).findOneBy({titleId: teacher.titleId});
+                const teacher = userData as TeacherDto;
+                const [degree, department, title] = await Promise.all([
+                    this.find(ScientificDegree, { degreeId: teacher.degreeId }),
+                    this.find(Department, { departmentId: teacher.departmentId }),
+                    this.find(Title, { titleId: teacher.titleId })
+                ]);
 
-                if (!degree || !department || !title) {
-                    return 1;
-                }
+                if (!degree || !department || !title) return 1;
 
-                result = await AppDataSource.getRepository(Teacher).insert(
-                    <Teacher>{
-                        username: userData.name,
-                        userSecondName: userData.secondName,
-                        userPatronymic: userData.patronymic,
-                        email: userData.email,
-                        role: role,
-                        passwordHash: await bcrypt.hash(userData.password, 5),
-                        department: department,
-                        scientificDegree: degree,
-                        title: title
+                return this.create(Teacher, {
+                    ...commonData,
+                    department,
+                    scientificDegree: degree,
+                    title
                 });
-            } else if (userData instanceof StudentDto) {
-                const student = <StudentDto> userData;
-                const faculty = await AppDataSource.getRepository(Faculty).findOneBy({facultyId: student.facultyId});
+            } 
+            else if (userData instanceof StudentDto) {
+                const student = userData as StudentDto;
+                const faculty = await this.find(Faculty, { facultyId: student.facultyId });
+                if (!faculty) return 1;
 
-                if (!faculty) {
-                    return 1;
-                }
-
-                result = await AppDataSource.getRepository(Student).insert(
-                    <Student>{
-                        username: userData.name,
-                        userSecondName: userData.secondName,
-                        userPatronymic: userData.patronymic,
-                        email: userData.email,
-                        role: role,
-                        passwordHash: await bcrypt.hash(userData.password, 5),
-                        faculty: faculty,
-                        groupNumber: student.group,
-                        course: student.course
-                })
-            } else if (role.roleName == adminRoleName || role.roleName == workerRoleName) {
-                result = await AppDataSource.getRepository(User).insert(
-                    {
-                        username: userData.name,
-                        userSecondName: userData.secondName,
-                        userPatronymic: userData.patronymic,
-                        email: userData.email,
-                        role: role,
-                        passwordHash: await bcrypt.hash(userData.password, 5)
-                })
+                return this.create(Student, {
+                    ...commonData,
+                    faculty,
+                    groupNumber: student.group,
+                    course: student.course
+                });
+            } 
+            else if (role.roleName === adminRoleName || role.roleName === workerRoleName) {
+                return this.create(User, commonData);
             }
 
-            if (result.identifiers == null) {
-                return 1;
-            }
-            return 0; // success
+            return 1;
         } catch (error) {
-            console.error('Update status error:', error);
-            return 1; // failure
-        }
-    }
-    
-    async createRole(roleName: string): Promise<number> {
-        const result = await AppDataSource.getRepository(Role).insert({roleName: roleName});
-        if (result.identifiers == null) {
+            console.error('Create user error:', error);
             return 1;
         }
+    }
 
-        return 0;
+    async updateUser(id: number, userData: UserDto): Promise<number> {
+        try {
+            const role = await this.find(Role, { roleId: userData.roleId });
+            if (!role) return 1;
+
+            const commonData = {
+                username: userData.name,
+                userSecondName: userData.secondName,
+                userPatronymic: userData.patronymic,
+                email: userData.email,
+                role: role,
+                passwordHash: await bcrypt.hash(userData.password, 5)
+            };
+
+            if (userData instanceof TeacherDto) {
+                const teacher = userData as TeacherDto;
+                const [degree, department, title] = await Promise.all([
+                    this.find(ScientificDegree, { degreeId: teacher.degreeId }),
+                    this.find(Department, { departmentId: teacher.departmentId }),
+                    this.find(Title, { titleId: teacher.titleId })
+                ]);
+
+                if (!degree || !department || !title) return 1;
+
+                return this.update(Teacher, { userId: id }, {
+                    ...commonData,
+                    department,
+                    scientificDegree: degree,
+                    title
+                });
+            } 
+            else if (userData instanceof StudentDto) {
+                const student = userData as StudentDto;
+                const faculty = await this.find(Faculty, { facultyId: student.facultyId });
+                if (!faculty) return 1;
+
+                return this.update(Student, { userId: id }, {
+                    ...commonData,
+                    faculty,
+                    groupNumber: student.group,
+                    course: student.course
+                });
+            } 
+            else if (role.roleName === adminRoleName || role.roleName === workerRoleName) {
+                return this.update(User, { userId: id }, commonData);
+            }
+
+            return 1;
+        } catch (error) {
+            console.error('Update user error:', error);
+            return 1;
+        }
+    }
+
+    // Методы для работы с ролями
+    async createRole(roleName: string): Promise<number> {
+        return this.create(Role, { roleName });
     }
 
     async findRole(roleName: string): Promise<Role | null> {
-        return await AppDataSource.getRepository(Role).findOneBy({roleName: roleName});
+        return this.find(Role, { roleName });
     }
 
     async getAllRoles(): Promise<Role[]> {
-        return await AppDataSource.getRepository(Role).find();
+        return this.getAll(Role);
     }
 
     async deleteRole(roleId: number): Promise<number> {
-        const result = await AppDataSource.getRepository(Role).delete({roleId: roleId});
-        if (result.affected == null || result.affected != 1) {
-            return 1;
-        }
-
-        return 0;
+        return this.delete(Role, { roleId });
     }
 
     async updateRole(roleId: number, roleName: string): Promise<number> {
-        const result = await AppDataSource.getRepository(Role).update(roleId, {roleName: roleName});
-        if (result.affected == null || result.affected != 1) {
-            return 1;
-        }
-
-        return 0;
+        return this.update(Role, { roleId }, { roleName });
     }
 
+    // Методы для работы с кафедрами
     async createDepartment(name: string): Promise<number> {
-        const result = await AppDataSource.getRepository(Department).insert({departmentName: name})
-        if (result.identifiers == null) {
-            return 1;
-        }
-
-        return 0;
+        return this.create(Department, { departmentName: name });
     }
-    
+
     async getAllDepartments(): Promise<Department[]> {
-        return await AppDataSource.getRepository(Department).find();
+        return this.getAll(Department, ['teachers']);
     }
-    
-    async findDepartment(name: string): Promise<Department> {
-        return await AppDataSource.getRepository(Department).findOneBy({departmentName: name});
+
+    async findDepartment(name: string): Promise<Department | null> {
+        return this.find(Department, { departmentName: name }, ['teachers']);
     }
-    
+
     async updateDepartment(id: number, newName: string): Promise<number> {
-        const result = await AppDataSource.getRepository(Department).update(id, {departmentName: newName});
-        if (result.affected == null || result.affected != 1) {
-            return 1;
-        }
-
-        return 0;
+        return this.update(Department, { departmentId: id }, { departmentName: newName });
     }
-    
+
     async deleteDepartment(id: number): Promise<number> {
-        const result = await AppDataSource.getRepository(Department).delete({departmentId: id});
-        if (result.affected == null || result.affected != 1) {
-            return 1;
-        }
-
-        return 0;
+        return this.delete(Department, { departmentId: id });
     }
 
+    // Методы для научных степеней
     async createScientificDegree(name: string): Promise<number> {
-        try {
-            const repo = AppDataSource.getRepository(ScientificDegree);
-            const degree = repo.create({ degreeName: name });
-            await repo.save(degree);
-            return 0; // success
-        } catch (error) {
-            console.error('Create scientific degree error:', error);
-            return 1; // failure
-        }
+        return this.create(ScientificDegree, { degreeName: name });
     }
-    
+
     async getAllScientificDegrees(): Promise<ScientificDegree[]> {
-        return AppDataSource
-            .getRepository(ScientificDegree)
-            .find({ relations: ['teachers'] });
+        return this.getAll(ScientificDegree, ['teachers']);
     }
-    
+
     async getScientificDegreeByName(name: string): Promise<ScientificDegree | null> {
-        return AppDataSource
-            .getRepository(ScientificDegree)
-            .findOne({
-                where: { degreeName: name },
-                relations: ['teachers']
-            });
+        return this.find(ScientificDegree, { degreeName: name }, ['teachers']);
     }
-    
+
     async updateScientificDegree(id: number, newName: string): Promise<number> {
-        try {
-            const repo = AppDataSource.getRepository(ScientificDegree);
-            const degree = await repo.findOneBy({ degreeId: id });
-            
-            if (!degree) {
-                return 1; // not found
-            }
-            
-            degree.degreeName = newName;
-            await repo.save(degree);
-            return 0; // success
-        } catch (error) {
-            console.error('Update scientific degree error:', error);
-            return 1; // failure
-        }
+        return this.update(ScientificDegree, { degreeId: id }, { degreeName: newName });
     }
-    
+
     async deleteScientificDegree(id: number): Promise<number> {
-        try {
-            const repo = AppDataSource.getRepository(ScientificDegree);
-            const degree = await repo.findOneBy({ degreeId: id });
-            
-            if (!degree) {
-                return 1; // not found
-            }
-            
-            await repo.remove(degree);
-            return 0; // success
-        } catch (error) {
-            console.error('Delete scientific degree error:', error);
-            return 1; // failure
-        }
+        return this.delete(ScientificDegree, { degreeId: id });
     }
 
+    // Методы для ученых званий
     async createTitle(name: string): Promise<number> {
-        try {
-            const repo = AppDataSource.getRepository(Title);
-            const degree = repo.create({ titleName: name });
-            await repo.save(degree);
-            return 0; // success
-        } catch (error) {
-            console.error('Create scientific degree error:', error);
-            return 1; // failure
-        }
+        return this.create(Title, { titleName: name });
     }
-    
+
     async getAllTitles(): Promise<Title[]> {
-        return AppDataSource
-            .getRepository(Title)
-            .find({ relations: ['teachers'] });
+        return this.getAll(Title, ['teachers']);
     }
-    
+
     async findTitle(name: string): Promise<Title | null> {
-        return AppDataSource
-            .getRepository(Title)
-            .findOne({
-                where: { titleName: name },
-                relations: ['teachers']
-            });
+        return this.find(Title, { titleName: name }, ['teachers']);
     }
-    
+
     async updateTitle(id: number, newName: string): Promise<number> {
-        try {
-            const repo = AppDataSource.getRepository(Title);
-            const title = await repo.findOneBy({ titleId: id });
-            
-            if (!title) {
-                return 1; // not found
-            }
-            
-            title.titleName = newName;
-            await repo.save(title);
-            return 0; // success
-        } catch (error) {
-            console.error('Update scientific degree error:', error);
-            return 1; // failure
-        }
+        return this.update(Title, { titleId: id }, { titleName: newName });
     }
-    
+
     async deleteTitle(id: number): Promise<number> {
-        try {
-            const repo = AppDataSource.getRepository(Title);
-            const title = await repo.findOneBy({ titleId: id });
-            
-            if (!title) {
-                return 1; // not found
-            }
-            
-            await repo.remove(title);
-            return 0; // success
-        } catch (error) {
-            console.error('Delete scientific degree error:', error);
-            return 1; // failure
-        }
+        return this.delete(Title, { titleId: id });
     }
 
+    // Методы для факультетов
     async createFaculty(name: string): Promise<number> {
-        try {
-            const repo = AppDataSource.getRepository(Faculty);
-            const faculty = repo.create({ facultyName: name });
-            await repo.save(faculty);
-            return 0; // success
-        } catch (error) {
-            console.error('Create faculty error:', error);
-            return 1; // failure
-        }
+        return this.create(Faculty, { facultyName: name });
     }
-    
+
     async getAllFaculties(): Promise<Faculty[]> {
-        return AppDataSource
-            .getRepository(Faculty)
-            .find({ relations: ['students'] });
+        return this.getAll(Faculty, ['students']);
     }
-    
+
     async getFacultyByName(name: string): Promise<Faculty | null> {
-        return AppDataSource
-            .getRepository(Faculty)
-            .findOne({
-                where: { facultyName: name },
-                relations: ['students']
-            });
+        return this.find(Faculty, { facultyName: name }, ['students']);
     }
-    
+
     async updateFaculty(id: number, newName: string): Promise<number> {
-        try {
-            const repo = AppDataSource.getRepository(Faculty);
-            const faculty = await repo.findOneBy({ facultyId: id });
-            
-            if (!faculty) {
-                return 1; // not found
-            }
-            
-            faculty.facultyName = newName;
-            await repo.save(faculty);
-            return 0; // success
-        } catch (error) {
-            console.error('Update faculty error:', error);
-            return 1; // failure
-        }
+        return this.update(Faculty, { facultyId: id }, { facultyName: newName });
     }
-    
+
     async deleteFaculty(id: number): Promise<number> {
-        try {
-            const repo = AppDataSource.getRepository(Faculty);
-            const faculty = await repo.findOneBy({ facultyId: id });
-            
-            if (!faculty) {
-                return 1; // not found
-            }
-            
-            await repo.remove(faculty);
-            return 0; // success
-        } catch (error) {
-            console.error('Delete faculty error:', error);
-            return 1; // failure
-        }
+        return this.delete(Faculty, { facultyId: id });
     }
 
+    // Методы для типов точек
     async createPointType(name: string): Promise<number> {
-        try {
-            const repo = AppDataSource.getRepository(PointType);
-            const pointType = repo.create({ typeName: name });
-            await repo.save(pointType);
-            return 0; // success
-        } catch (error) {
-            console.error('Create point type error:', error);
-            return 1; // failure
-        }
+        return this.create(PointType, { typeName: name });
     }
-    
+
     async getAllPointTypes(): Promise<PointType[]> {
-        return AppDataSource
-            .getRepository(PointType)
-            .find({ relations: ['readingPoints'] });
+        return this.getAll(PointType, ['readingPoints']);
     }
-    
+
     async findPointType(name: string): Promise<PointType | null> {
-        return AppDataSource
-            .getRepository(PointType)
-            .findOne({
-                where: { typeName: name },
-                relations: ['readingPoints']
-            });
+        return this.find(PointType, { typeName: name }, ['readingPoints']);
     }
-    
+
     async updatePointType(id: number, newName: string): Promise<number> {
-        try {
-            const repo = AppDataSource.getRepository(PointType);
-            const pointType = await repo.findOneBy({ typeId: id });
-            
-            if (!pointType) {
-                return 1; // not found
-            }
-            
-            pointType.typeName = newName;
-            await repo.save(pointType);
-            return 0; // success
-        } catch (error) {
-            console.error('Update point type error:', error);
-            return 1; // failure
-        }
+        return this.update(PointType, { typeId: id }, { typeName: newName });
     }
-    
+
     async deletePointType(id: number): Promise<number> {
-        try {
-            const repo = AppDataSource.getRepository(PointType);
-            const pointType = await repo.findOneBy({ typeId: id });
-            
-            if (!pointType) {
-                return 1; // not found
-            }
-            
-            await repo.remove(pointType);
-            return 0; // success
-        } catch (error) {
-            console.error('Delete point type error:', error);
-            return 1; // failure
-        }
+        return this.delete(PointType, { typeId: id });
     }
 
+    // Методы для статусов
     async createStatus(name: string): Promise<number> {
-        try {
-            const repo = AppDataSource.getRepository(Status);
-            const status = repo.create({ statusName: name });
-            await repo.save(status);
-            return 0; // success
-        } catch (error) {
-            console.error('Create status error:', error);
-            return 1; // failure
-        }
+        return this.create(Status, { statusName: name });
     }
-    
+
     async getAllStatuses(): Promise<Status[]> {
-        return AppDataSource
-            .getRepository(Status)
-            .find({ relations: ['rentedBooks'] });
+        return this.getAll(Status, ['rentedBooks']);
     }
-    
+
     async findStatus(name: string): Promise<Status | null> {
-        return AppDataSource
-            .getRepository(Status)
-            .findOne({
-                where: { statusName: name },
-                relations: ['rentedBooks']
-            });
+        return this.find(Status, { statusName: name }, ['rentedBooks']);
     }
-    
+
     async updateStatus(id: number, newName: string): Promise<number> {
-        try {
-            const repo = AppDataSource.getRepository(Status);
-            const status = await repo.findOneBy({ statusId: id });
-            
-            if (!status) {
-                return 1; // not found
-            }
-            
-            status.statusName = newName;
-            await repo.save(status);
-            return 0; // success
-        } catch (error) {
-            console.error('Update status error:', error);
-            return 1; // failure
-        }
+        return this.update(Status, { statusId: id }, { statusName: newName });
     }
-    
+
     async deleteStatus(id: number): Promise<number> {
-        try {
-            const repo = AppDataSource.getRepository(Status);
-            const status = await repo.findOneBy({ statusId: id });
-            
-            if (!status) {
-                return 1; // not found
-            }
-            
-            await repo.remove(status);
-            return 0; // success
-        } catch (error) {
-            console.error('Delete status error:', error);
-            return 1; // failure
-        }
+        return this.delete(Status, { statusId: id });
     }
 
+    // Методы для работы с пользователями
     async getAllUsers(): Promise<User[]> {
-        return AppDataSource
-            .getRepository(User)
-            .find({ relations: ['rentedBooks', 'points'] });
+        return this.getAll(User, ['rentedBooks', 'points']);
     }
-    
+
     async findUser(userDto: UserDto): Promise<User | null> {
-        return AppDataSource
-            .getRepository(User)
-            .findOne({
-                where: {
-                    username: userDto.name,
-                    userPatronymic: userDto.patronymic,
-                    email: userDto.email
-                },
-                relations: ['rentedBooks', 'points']
-        });
+        return this.find(User, {
+            username: userDto.name,
+            userPatronymic: userDto.patronymic,
+            email: userDto.email
+        }, ['rentedBooks', 'points']);
     }
-    
-    async updateUser(id: number, userData: UserDto): Promise<number> {
-        try {
-            const repo = AppDataSource.getRepository(User);
-            const user = await repo.findOneBy({ userId: id });
-            
-            if (!user) {
-                return 1; // not found
-            }
 
-            const role = await AppDataSource.getRepository(Role).findOneBy({roleId: userData.roleId});
-            if (!role) {
-                return 1;
-            }
-
-            let result: UpdateResult;
-            if (userData instanceof TeacherDto) {
-                const teacher = <TeacherDto> userData;
-                const degree = await AppDataSource.getRepository(ScientificDegree).findOneBy({degreeId: teacher.degreeId});
-                const department = await AppDataSource.getRepository(Department).findOneBy({departmentId: teacher.departmentId});
-                const title = await AppDataSource.getRepository(Title).findOneBy({titleId: teacher.titleId});
-
-                if (!degree || !department || !title) {
-                    return 1;
-                }
-
-                result = await AppDataSource.getRepository(Teacher).update(
-                    id,
-                    <Teacher>{
-                        username: userData.name,
-                        userSecondName: userData.secondName,
-                        userPatronymic: userData.patronymic,
-                        email: userData.email,
-                        role: role,
-                        passwordHash: await bcrypt.hash(userData.password, 5),
-                        department: department,
-                        scientificDegree: degree,
-                        title: title
-                });
-            } else if (user instanceof StudentDto) {
-                const student = <StudentDto> user;
-                const faculty = await AppDataSource.getRepository(Faculty).findOneBy({facultyId: student.facultyId});
-
-                if (!faculty) {
-                    return 1;
-                }
-
-                result = await AppDataSource.getRepository(Student).update(
-                    id,
-                    <Student>{
-                        username: userData.name,
-                        userSecondName: userData.secondName,
-                        userPatronymic: userData.patronymic,
-                        email: userData.email,
-                        role: role,
-                        passwordHash: await bcrypt.hash(userData.password, 5),
-                        faculty: faculty,
-                        groupNumber: student.group,
-                        course: student.course
-                })
-            } else if (role.roleName == adminRoleName || role.roleName == workerRoleName) {
-                result = await AppDataSource.getRepository(User).update(
-                    id,
-                    {
-                        username: userData.name,
-                        userSecondName: userData.secondName,
-                        userPatronymic: userData.patronymic,
-                        email: userData.email,
-                        role: role,
-                        passwordHash: await bcrypt.hash(userData.password, 5)
-                })
-            }
-
-            if (result.generatedMaps == null) {
-                return 1;
-            }
-            return 0; // success
-        } catch (error) {
-            console.error('Update status error:', error);
-            return 1; // failure
-        }
-    }
-    
     async deleteUser(id: number): Promise<number> {
-        try {
-            const repo = AppDataSource.getRepository(User);
-            const user = await repo.findOneBy({ userId: id });
-            
-            if (!user) {
-                return 1; // not found
-            }
-            
-            await repo.remove(user);
-            return 0; // success
-        } catch (error) {
-            console.error('Delete status error:', error);
-            return 1; // failure
-        }
+        return this.delete(User, { userId: id });
     }
 }

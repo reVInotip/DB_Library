@@ -6,7 +6,8 @@ import { PointUser } from "../entities/points/point_user";
 import { User } from "../entities/user/user";
 import { BookPopularityDto, BookStatResultDto, BookStatsFilterDto, BookStatsResponseDto, PopularBooksFilterDto } from "../../dto/books.dto";
 import { Book } from "../entities/books/book";
-import { EntityTarget } from "typeorm";
+import { DeepPartial, EntityTarget, FindOptionsWhere } from "typeorm";
+import { QueryDeepPartialEntity } from "typeorm/query-builder/QueryPartialEntity";
 
 export type RoleType = 'teacher' | 'student' | 'admin' | 'worker'
 type Status = 'Expired'
@@ -40,39 +41,55 @@ export abstract class BaseSession implements ISession {
         this.expiresAt = expiresAt;
     }
 
-    async create<T>(entity: EntityTarget<T>, data: any): Promise<number> {
-        const result = await AppDataSource.getRepository(entity).insert(data);
-        if (result.identifiers == null) {
+    // Улучшенные базовые CRUD операции
+    async create<T>(
+        entity: EntityTarget<T>, 
+        data: DeepPartial<T>,
+    ): Promise<number> {
+        try {
+            const repo = AppDataSource.getRepository(entity);
+            const entityObj = repo.create(data);
+            await repo.save(entityObj);
+            return 0;
+        } catch (error) {
+            console.error(`Create error for ${entity.toString()}:`, error);
             return 1;
         }
-
-        return 0;
     }
 
-    async find<T>(entity: EntityTarget<T>, data: any): Promise<T | null> {
-        return await AppDataSource.getRepository(entity).findOneBy(data);
+    async find<T>(
+        entity: EntityTarget<T>,
+        conditions: FindOptionsWhere<T>,
+        relations?: string[]
+    ): Promise<T | null> {
+        return AppDataSource.getRepository(entity).findOne({
+            where: conditions,
+            relations
+        });
     }
 
-    async getAll<T>(entity: EntityTarget<T>): Promise<T[]> {
-        return await AppDataSource.getRepository(entity).find();
+    async getAll<T>(
+        entity: EntityTarget<T>,
+        relations?: string[]
+    ): Promise<T[]> {
+        return AppDataSource.getRepository(entity).find({ relations });
     }
 
-    async delete<T>(entity: EntityTarget<T>, id: number): Promise<number> {
-        const result = await AppDataSource.getRepository(entity).delete(id);
-        if (result.affected == null || result.affected != 1) {
-            return 1;
-        }
-
-        return 0;
+    async delete<T>(
+        entity: EntityTarget<T>, 
+        conditions: FindOptionsWhere<T>
+    ): Promise<number> {
+        const result = await AppDataSource.getRepository(entity).delete(conditions);
+        return result.affected ? 0 : 1;
     }
 
-    async update<T>(entity: EntityTarget<T>, id: number, data: any): Promise<number> {
-        const result = await AppDataSource.getRepository(entity).update(id, data);
-        if (result.affected == null || result.affected != 1) {
-            return 1;
-        }
-
-        return 0;
+    async update<T>(
+        entity: EntityTarget<T>,
+        conditions: FindOptionsWhere<T>,
+        data: QueryDeepPartialEntity<T>
+    ): Promise<number> {
+        const result = await AppDataSource.getRepository(entity).update(conditions, data);
+        return result.affected ? 0 : 1;
     }
 
     async getReadersByReadingPoint(pointId: number, userInfoDto: UserInfoDto): Promise<ReadersWithCountDto> {
