@@ -27,16 +27,16 @@ export class UserController {
 
         try {
             const adminSession = <AdminSession> req.session;
-            const result = await adminSession.createTitle(req.body.titleName);
+            const result = await adminSession.createUser(req.body);
             
             if (result !== 0) {
-                return res.status(400).json({ message: 'Title creation failed' });
+                return res.status(400).json({ message: 'User creation failed' });
             }
             
-            res.status(201).json({ message: 'Title created successfully' });
+            res.status(201).json({ message: 'User created successfully' });
         } catch (error) {
             res.status(500).json({ 
-                message: error instanceof Error ? error.message : 'Title creation error' 
+                message: error instanceof Error ? error.message : 'User creation error' 
             });
         }
     }
@@ -44,28 +44,28 @@ export class UserController {
     async getAll(req: AuthRequest, res: Response) {
         try {
             const adminSession = <AdminSession> req.session;
-            const titles = await adminSession.getAllTitles();
-            res.json(titles);
+            const users = await adminSession.getAllUsers();
+            res.json(users);
         } catch (error) {
             res.status(500).json({
-                message: error instanceof Error ? error.message : 'Failed to fetch titles'
+                message: error instanceof Error ? error.message : 'Failed to fetch users'
             });
         }
     }
 
-    async getByName(req: AuthRequest, res: Response) {
+    async getBySomething(req: AuthRequest, res: Response) {
         try {
             const adminSession = <AdminSession> req.session;
-            const title = await adminSession.findTitle(req.params.titleName);
+            const user = await adminSession.findUser(req.body);
             
-            if (!title) {
-                return res.status(404).json({ message: 'Title not found' });
+            if (!user) {
+                return res.status(404).json({ message: 'User not found' });
             }
             
-            res.json(title);
+            res.json(user);
         } catch (error) {
             res.status(500).json({
-                message: error instanceof Error ? error.message : 'Failed to fetch title'
+                message: error instanceof Error ? error.message : 'Failed to fetch user'
             });
         }
     }
@@ -74,16 +74,16 @@ export class UserController {
         try {
             const id = parseInt(req.params.id);
             const adminSession = <AdminSession> req.session;
-            const result = await adminSession.updateTitle(id, req.body.titleName);
+            const result = await adminSession.updateUser(id, req.body);
             
             if (result !== 0) {
-                return res.status(400).json({ message: 'Title update failed' });
+                return res.status(400).json({ message: 'User update failed' });
             }
             
-            res.json({ message: 'Title updated successfully' });
+            res.json({ message: 'User updated successfully' });
         } catch (error) {
             res.status(500).json({
-                message: error instanceof Error ? error.message : 'Title update error'
+                message: error instanceof Error ? error.message : 'User update error'
             });
         }
     }
@@ -92,16 +92,16 @@ export class UserController {
         try {
             const id = parseInt(req.params.id);
             const adminSession = <AdminSession> req.session;
-            const result = await adminSession.deleteTitle(id);
+            const result = await adminSession.deleteUser(id);
             
             if (result !== 0) {
-                return res.status(400).json({ message: 'Title deletion failed' });
+                return res.status(400).json({ message: 'User deletion failed' });
             }
             
-            res.json({ message: 'Title deleted successfully' });
+            res.json({ message: 'User deleted successfully' });
         } catch (error) {
             res.status(500).json({
-                message: error instanceof Error ? error.message : 'Title deletion error'
+                message: error instanceof Error ? error.message : 'User deletion error'
             });
         }
     }

@@ -5,6 +5,7 @@ import { departmentController, DepartmentController } from '../controller/user/d
 import { scientificDegreeController, ScientificDegreeController } from '../controller/user/degree.controller';
 import { titleController, TitleController } from '../controller/user/title.controller';
 import { facultyController, FacultyController } from '../controller/user/faculty.controller';
+import { userController } from '../controller/user/user.contorller';
 
 const router = express.Router();
 
@@ -40,5 +41,11 @@ router.get('/faculty', authController.authenticateJWT, facultyController.getAll.
 router.get('/faculty/:facultyName', authController.authenticateJWT, facultyController.getByName.bind(facultyController));
 router.put('/faculty/:id', authController.authenticateJWT, facultyController.update.bind(facultyController));
 router.delete('/faculty/:id', authController.authenticateJWT, facultyController.delete.bind(facultyController));
+
+router.post('/faculty', authController.authenticateJWT, userController.create.bind(userController));
+router.get('/faculty', authController.authenticateJWT, userController.getAll.bind(userController));
+router.put('/faculty/:facultyName', authController.authenticateJWT, userController.getBySomething.bind(userController));
+router.put('/faculty/:id', authController.authenticateJWT, userController.update.bind(userController));
+router.delete('/faculty/:id', authController.authenticateJWT, userController.delete.bind(userController));
 
 export default router;
