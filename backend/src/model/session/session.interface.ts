@@ -4,9 +4,9 @@ import { DebtorFilterDto, DebtorResultDto, DebtorsWithCountDto } from "../../dto
 import { RentedBook } from "../entities/books/rented_book";
 import { PointUser } from "../entities/points/point_user";
 import { User } from "../entities/user/user";
-import { BookPopularityDto, BookStatResultDto, BookStatsFilterDto, BookStatsResponseDto, PopularBooksFilterDto } from "../../dto/books.dto";
+import { BookPopularityDto, BookSearchCriteria, BookStatResultDto, BookStatsFilterDto, BookStatsResponseDto, PopularBooksFilterDto } from "../../dto/books.dto";
 import { Book } from "../entities/books/book";
-import { DeepPartial, EntityTarget, FindManyOptions, FindOneOptions, FindOptionsWhere, In } from "typeorm";
+import { Between, DeepPartial, EntityTarget, FindManyOptions, FindOneOptions, FindOptionsWhere, In, IsNull, Like, Not } from "typeorm";
 import { QueryDeepPartialEntity } from "typeorm/query-builder/QueryPartialEntity";
 import { ReadingPoint } from "../entities/points/reading_point";
 
@@ -133,11 +133,68 @@ export abstract class AuthorizedSession extends BaseSession {
         super(userId, role, token, expiresAt);
     }
 
+    async findBooks(criteria: BookSearchCriteria): Promise<Book[]> {
+        const where: FindOptionsWhere<Book> = {};
+        
+        if (criteria.title) {
+            where.title = Like(`%${criteria.title}%`);
+        }
+        
+        if (criteria.author) {
+            where.author = Like(`%${criteria.author}%`);
+        }
+        
+        if (criteria.minReleaseDate || criteria.maxReleaseDate) {
+            where.releaseDate = Between(
+                criteria.minReleaseDate || new Date(0),
+                criteria.maxReleaseDate || new Date()
+            );
+        }
+        
+        if (criteria.minAdmissionDate || criteria.maxAdmissionDate) {
+            where.admissionDate = Between(
+                criteria.minAdmissionDate || new Date(0),
+                criteria.maxAdmissionDate || new Date()
+            );
+        }
+        
+        if (criteria.minCost || criteria.maxCost) {
+            where.cost = Between(
+                criteria.minCost || 0,
+                criteria.maxCost || Number.MAX_SAFE_INTEGER
+            );
+        }
+        
+        if (criteria.fromAnotherLib !== undefined) {
+            where.fromAnotherLib = criteria.fromAnotherLib;
+        }
+        
+        if (criteria.isLost !== undefined) {
+            where.lostDate = criteria.isLost ? Not(IsNull()) : IsNull();
+        }
+        
+        return this.getAll(Book, [], { where });
+    }
+
+    async getBookById(bookId: number): Promise<Book | null> {
+        return this.find(Book, { bookId });
+    }
+
+    async getAllBooks(): Promise<Book[]> {
+        return this.getAll(Book);
+    }
+
     async getReadingPointById(id: number): Promise<ReadingPoint | null> {
         return this.find(ReadingPoint, 
             { pointId: id }, 
             ['type', 'books', 'rentedBooks']
         );
+    }
+
+    async getAvailableBooks(): Promise<Book[]> {
+        return this.getAll(Book, [], {
+            where: { lostDate: IsNull() }
+        });
     }
 
     async getAllReadingPoints(): Promise<ReadingPoint[]> {
@@ -428,6 +485,78 @@ export abstract class SuperuserSession extends AuthorizedSession {
             return 0;
         } catch (error) {
             console.error('Remove books from reading point error:', error);
+            return 1;
+        }
+    }
+
+    async createBook(bookData: {
+        title: string;
+        author: string;
+        releaseDate: Date;
+        admissionDate: Date;
+        cost: number;
+        fromAnotherLib: boolean;
+        lostDate?: Date;
+    }): Promise<number> {
+        try {
+            return this.create(Book, {
+                title: bookData.title,
+                author: bookData.author,
+                releaseDate: bookData.releaseDate,
+                admissionDate: bookData.admissionDate,
+                cost: bookData.cost,
+                fromAnotherLib: bookData.fromAnotherLib,
+                lostDate: bookData.lostDate
+            });
+        } catch (error) {
+            console.error('Create book error:', error);
+            return 1;
+        }
+    }
+
+    async markBookAsLost(bookId: number): Promise<number> {
+        return this.update(Book, { bookId }, { 
+            lostDate: new Date() 
+        });
+    }
+
+    async markBookAsFound(bookId: number): Promise<number> {
+        return this.update(Book, { bookId }, { 
+            lostDate: null 
+        });
+    }
+
+    async deleteBook(bookId: number): Promise<number> {
+        return this.delete(Book, { bookId });
+    }
+
+    async getLostBooks(): Promise<Book[]> {
+        return this.getAll(Book, [], {
+            where: { lostDate: Not(IsNull()) }
+        });
+    }
+
+    async updateBook(
+        bookId: number, 
+        updateData: {
+            title?: string;
+            author?: string;
+            releaseDate?: Date;
+            admissionDate?: Date;
+            cost?: number;
+            fromAnotherLib?: boolean;
+            lostDate?: Date | null;
+        }
+    ): Promise<number> {
+        try {
+            // Обработка специального случая для сброса lostDate
+            if (updateData.lostDate === null) {
+                return this.update(Book, { bookId }, { lostDate: null });
+            }
+            
+            return this.update(Book, { bookId }, updateData);
+        } catch (error) {
+            console.error('Update book error:', error);
             return 1;
         }
     }

@@ -49,3 +49,16 @@ export class BookWithReadingPointDto {
     type: PointType;
     address: string;
 }
+
+export class BookSearchCriteria {
+    title?: string;
+    author?: string;
+    minReleaseDate?: Date;
+    maxReleaseDate?: Date;
+    minAdmissionDate?: Date;
+    maxAdmissionDate?: Date;
+    minCost?: number;
+    maxCost?: number;
+    fromAnotherLib?: boolean;
+    isLost?: boolean;
+}

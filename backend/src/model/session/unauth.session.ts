@@ -1,9 +1,10 @@
-import { In } from "typeorm";
+import { Between, FindOptionsWhere, In, IsNull, Like, Not } from "typeorm";
 import { Book } from "../entities/books/book";
 import { PointType } from "../entities/points/point_type";
 import { ReadingPoint } from "../entities/points/reading_point";
 import { BaseSession } from "./session.interface";
 import AppDataSource from "../data-source";
+import { BookSearchCriteria } from "../../dto/books.dto";
 
 export class UnauthorizedSession extends BaseSession {
     constructor(userId: number, token: string, expiresAt: Date) {
