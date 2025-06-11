@@ -6,10 +6,11 @@ import { PointUser } from "../entities/points/point_user";
 import { User } from "../entities/user/user";
 import { BookPopularityDto, BookStatResultDto, BookStatsFilterDto, BookStatsResponseDto, PopularBooksFilterDto } from "../../dto/books.dto";
 import { Book } from "../entities/books/book";
-import { DeepPartial, EntityTarget, FindOptionsWhere } from "typeorm";
+import { DeepPartial, EntityTarget, FindManyOptions, FindOneOptions, FindOptionsWhere, In } from "typeorm";
 import { QueryDeepPartialEntity } from "typeorm/query-builder/QueryPartialEntity";
+import { ReadingPoint } from "../entities/points/reading_point";
 
-export type RoleType = 'teacher' | 'student' | 'admin' | 'worker'
+export type RoleType = 'teacher' | 'student' | 'admin' | 'worker' | 'unauth';
 type Status = 'Expired'
 
 export interface ISession {
@@ -21,10 +22,14 @@ export interface ISession {
     refresh(): Promise<void>;
     //getProfile(): Promise<User>;
     //getRentedBooks(): Promise<RentedBook[]>;
-    getReadersByReadingPoint(pointId: number, userInfoDto: UserInfoDto): Promise<ReadersWithCountDto>;
-    getDebtors(filters: DebtorFilterDto): Promise<DebtorsWithCountDto>;
-    getPopularBooks(filter: PopularBooksFilterDto): Promise<BookPopularityDto[]>;
+    //getReadersByReadingPoint(pointId: number, userInfoDto: UserInfoDto): Promise<ReadersWithCountDto>;
+    //getDebtors(filters: DebtorFilterDto): Promise<DebtorsWithCountDto>;
+    //getPopularBooks(filter: PopularBooksFilterDto): Promise<BookPopularityDto[]>;
     //createNewUser(userData: UserDto): Promise<[number, string]>;
+
+    getReadingPointById(id: number): Promise<ReadingPoint | null>;
+    getAllReadingPoints(): Promise<ReadingPoint[]>;
+    getReadingPointsByType(typeId: number): Promise<ReadingPoint[]>;
 }
   
 // Базовый класс для всех сессий
@@ -42,9 +47,9 @@ export abstract class BaseSession implements ISession {
     }
 
     // Улучшенные базовые CRUD операции
-    async create<T>(
+    protected async create<T>(
         entity: EntityTarget<T>, 
-        data: DeepPartial<T>,
+        data: DeepPartial<T>
     ): Promise<number> {
         try {
             const repo = AppDataSource.getRepository(entity);
@@ -57,25 +62,31 @@ export abstract class BaseSession implements ISession {
         }
     }
 
-    async find<T>(
+    protected async find<T>(
         entity: EntityTarget<T>,
         conditions: FindOptionsWhere<T>,
-        relations?: string[]
+        relations?: string[],
+        options?: FindOneOptions<T>
     ): Promise<T | null> {
         return AppDataSource.getRepository(entity).findOne({
             where: conditions,
-            relations
+            relations,
+            ...options
         });
     }
 
-    async getAll<T>(
+    protected async getAll<T>(
         entity: EntityTarget<T>,
-        relations?: string[]
+        relations?: string[],
+        options?: FindManyOptions<T>
     ): Promise<T[]> {
-        return AppDataSource.getRepository(entity).find({ relations });
+        return AppDataSource.getRepository(entity).find({
+            relations,
+            ...options
+        });
     }
 
-    async delete<T>(
+    protected async delete<T>(
         entity: EntityTarget<T>, 
         conditions: FindOptionsWhere<T>
     ): Promise<number> {
@@ -83,13 +94,63 @@ export abstract class BaseSession implements ISession {
         return result.affected ? 0 : 1;
     }
 
-    async update<T>(
+    protected async update<T>(
         entity: EntityTarget<T>,
         conditions: FindOptionsWhere<T>,
         data: QueryDeepPartialEntity<T>
     ): Promise<number> {
         const result = await AppDataSource.getRepository(entity).update(conditions, data);
         return result.affected ? 0 : 1;
+    }
+
+    async getReadingPointById(id: number): Promise<ReadingPoint | null> {
+        return this.find(ReadingPoint, 
+            { pointId: id }, 
+            ['type', 'books']
+        );
+    }
+
+    async getAllReadingPoints(): Promise<ReadingPoint[]> {
+        return this.getAll(ReadingPoint, 
+            ['type', 'books']
+        );
+    }
+
+    async getReadingPointsByType(typeId: number): Promise<ReadingPoint[]> {
+        return this.getAll(ReadingPoint, 
+            ['type', 'books'],
+            { where: { type: { typeId } } }
+        );
+    }
+
+    abstract destroy(): Promise<void>;
+    abstract refresh(): Promise<void>;
+    //abstract createNewUser(userData: UserDto): Promise<[number, string]>;
+}
+
+export abstract class AuthorizedSession extends BaseSession {
+    constructor(userId: number, role: RoleType, token: string, expiresAt: Date) {
+        super(userId, role, token, expiresAt);
+    }
+
+    async getReadingPointById(id: number): Promise<ReadingPoint | null> {
+        return this.find(ReadingPoint, 
+            { pointId: id }, 
+            ['type', 'books', 'rentedBooks']
+        );
+    }
+
+    async getAllReadingPoints(): Promise<ReadingPoint[]> {
+        return this.getAll(ReadingPoint, 
+            ['type', 'books', 'rentedBooks']
+        );
+    }
+
+    async getReadingPointsByType(typeId: number): Promise<ReadingPoint[]> {
+        return this.getAll(ReadingPoint, 
+            ['type', 'books', 'rentedBooks'],
+            { where: { type: { typeId } } }
+        );
     }
 
     async getReadersByReadingPoint(pointId: number, userInfoDto: UserInfoDto): Promise<ReadersWithCountDto> {
@@ -326,4 +387,48 @@ export abstract class BaseSession implements ISession {
     abstract destroy(): Promise<void>;
     abstract refresh(): Promise<void>;
     //abstract createNewUser(userData: UserDto): Promise<[number, string]>;
+}
+
+export abstract class SuperuserSession extends AuthorizedSession {
+    constructor(userId: number, role: RoleType, token: string, expiresAt: Date) {
+        super(userId, role, token, expiresAt);
+    }
+
+    async addBooksToReadingPoint(
+        pointId: number, 
+        bookIds: number[]
+    ): Promise<number> {
+        try {
+            const point = await this.getReadingPointById(pointId);
+            if (!point) return 1;
+
+            const books = await this.getAll(Book, [], { 
+                where: { bookId: In(bookIds) } 
+            });
+
+            point.books = [...point.books, ...books];
+            await AppDataSource.getRepository(ReadingPoint).save(point);
+            return 0;
+        } catch (error) {
+            console.error('Add books to reading point error:', error);
+            return 1;
+        }
+    }
+
+    async removeBooksFromReadingPoint(
+        pointId: number, 
+        bookIds: number[]
+    ): Promise<number> {
+        try {
+            const point = await this.getReadingPointById(pointId);
+            if (!point) return 1;
+
+            point.books = point.books.filter(book => !bookIds.includes(book.bookId));
+            await AppDataSource.getRepository(ReadingPoint).save(point);
+            return 0;
+        } catch (error) {
+            console.error('Remove books from reading point error:', error);
+            return 1;
+        }
+    }
 }

@@ -42,10 +42,10 @@ router.get('/faculty/:facultyName', authController.authenticateJWT, facultyContr
 router.put('/faculty/:id', authController.authenticateJWT, facultyController.update.bind(facultyController));
 router.delete('/faculty/:id', authController.authenticateJWT, facultyController.delete.bind(facultyController));
 
-router.post('/faculty', authController.authenticateJWT, userController.create.bind(userController));
-router.get('/faculty', authController.authenticateJWT, userController.getAll.bind(userController));
-router.put('/faculty/:facultyName', authController.authenticateJWT, userController.getBySomething.bind(userController));
-router.put('/faculty/:id', authController.authenticateJWT, userController.update.bind(userController));
-router.delete('/faculty/:id', authController.authenticateJWT, userController.delete.bind(userController));
+router.post('/', authController.authenticateJWT, userController.create.bind(userController));
+router.get('/', authController.authenticateJWT, userController.getAll.bind(userController));
+router.put('/', authController.authenticateJWT, userController.getBySomething.bind(userController));
+router.put('/:id', authController.authenticateJWT, userController.update.bind(userController));
+router.delete('/:id', authController.authenticateJWT, userController.delete.bind(userController));
 
 export default router;

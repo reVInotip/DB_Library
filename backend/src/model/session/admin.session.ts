@@ -1,4 +1,4 @@
-import { BaseEntity, EntityTarget, InsertResult, UpdateResult } from "typeorm";
+import { BaseEntity, EntityTarget, In, InsertResult, UpdateResult } from "typeorm";
 import { StudentDto, TeacherDto, UserDto } from "../../dto/user_info.dto";
 import { AuthService } from "../auth/auth.service";
 import AppDataSource from "../data-source";
@@ -10,13 +10,15 @@ import { Role } from "../entities/user/role";
 import { ScientificDegree } from "../entities/user/scientific_degree";
 import { Title } from "../entities/user/title";
 import { User } from "../entities/user/user";
-import { BaseSession } from "./session.interface";
+import { AuthorizedSession, BaseSession, SuperuserSession } from "./session.interface";
 import { Teacher } from "../entities/user/teacher";
 import * as bcrypt from 'bcryptjs';
 import { Student } from "../entities/user/student";
 import { adminRoleName, workerRoleName } from "../session.manager";
+import { ReadingPoint } from "../entities/points/reading_point";
+import { Book } from "../entities/books/book";
 
-export class AdminSession extends BaseSession {
+export class AdminSession extends SuperuserSession {
     private authService: AuthService;
     
     constructor(userId: number, token: string, expiresAt: Date, authService: AuthService) {
@@ -303,5 +305,92 @@ export class AdminSession extends BaseSession {
 
     async deleteUser(id: number): Promise<number> {
         return this.delete(User, { userId: id });
+    }
+
+    async createReadingPoint(
+        typeId: number, 
+        address: string, 
+        bookIds?: number[]
+    ): Promise<number> {
+        try {
+            const type = await this.find(PointType, { typeId });
+            if (!type) return 1;
+
+            const books = bookIds 
+                ? await this.getAll(Book, [], { where: { bookId: In(bookIds) } })
+                : [];
+
+            return this.create(ReadingPoint, {
+                type,
+                address,
+                books
+            });
+        } catch (error) {
+            console.error('Create reading point error:', error);
+            return 1;
+        }
+    }
+
+    async getReadingPointById(id: number): Promise<ReadingPoint | null> {
+        return this.find(ReadingPoint, 
+            { pointId: id }, 
+            ['type', 'books', 'rentedBooks', 'users']
+        );
+    }
+
+    async updateReadingPoint(
+        id: number, 
+        updateData: {
+            typeId?: number;
+            address?: string;
+            bookIds?: number[];
+        }
+    ): Promise<number> {
+        try {
+            const updateObj: any = {};
+            
+            if (updateData.typeId !== undefined) {
+                const type = await this.find(PointType, { typeId: updateData.typeId });
+                if (!type) return 1;
+                updateObj.type = type;
+            }
+
+            if (updateData.address !== undefined) {
+                updateObj.address = updateData.address;
+            }
+
+            if (updateData.bookIds !== undefined) {
+                const books = await this.getAll(Book, [], { 
+                    where: { bookId: In(updateData.bookIds) } 
+                });
+                updateObj.books = books;
+            }
+
+            return this.update(
+                ReadingPoint, 
+                { pointId: id }, 
+                updateObj
+            );
+        } catch (error) {
+            console.error('Update reading point error:', error);
+            return 1;
+        }
+    }
+
+    async deleteReadingPoint(id: number): Promise<number> {
+        return this.delete(ReadingPoint, { pointId: id });
+    }
+
+    async getAllReadingPoints(): Promise<ReadingPoint[]> {
+        return this.getAll(ReadingPoint, 
+            ['type', 'books', 'rentedBooks', 'users']
+        );
+    }
+
+    async getReadingPointsByType(typeId: number): Promise<ReadingPoint[]> {
+        return this.getAll(ReadingPoint, 
+            ['type', 'books', 'rentedBooks', 'users'],
+            { where: { type: { typeId } } }
+        );
     }
 }

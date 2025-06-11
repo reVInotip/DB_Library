@@ -1,8 +1,8 @@
-import { BaseSession } from "./session.interface";
+import { AuthorizedSession, BaseSession, SuperuserSession } from "./session.interface";
 
-export class WorkerSession extends BaseSession {
+export class WorkerSession extends SuperuserSession {
     constructor(userId: number, token: string, expiresAt: Date) {
-        super(userId, 'student', token, expiresAt);
+        super(userId, 'worker', token, expiresAt);
     }
     
     destroy(): Promise<void> {

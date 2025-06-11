@@ -1,6 +1,7 @@
 import { Request, Response, NextFunction } from 'express';
 import { AuthRequest } from "./auth_request";
 import manager, { SessionManager } from '../../model/session.manager';
+import { ISession } from '../../model/session/session.interface';
 
 export class AuthController {
     private sessionManager: SessionManager;
@@ -29,6 +30,30 @@ export class AuthController {
             if (!session) {
                 res.status(401).json({ message: 'Invalid session' }).send();
                 return;
+            }
+
+            req.session = session;
+            next();
+        } catch (err) {
+            res.status(403).json({ message: 'Token invalid or expired' }).send();
+        }
+    }
+
+    async authHook(req: AuthRequest, res: Response, next: NextFunction) {
+        const authHeader = req.headers.authorization;
+
+        if (!authHeader || !authHeader.startsWith('Bearer ')) {
+            res.status(401).json({ message: 'No token provided' }).send();
+            return;
+        }
+
+        const token = authHeader.split(' ')[1];
+
+        try {
+            let session: ISession = this.sessionManager.getSession(token);
+
+            if (!session) {
+                session = this.sessionManager.createUnauthSession();
             }
 
             req.session = session;

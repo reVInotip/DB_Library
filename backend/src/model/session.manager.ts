@@ -1,4 +1,4 @@
-import { ISession, RoleType } from './session/session.interface';
+import { AuthorizedSession, RoleType } from './session/session.interface';
 import { AuthService } from './auth/auth.service';
 import { User } from './entities/user/user';
 import { StudentSession } from './session/student.session';
@@ -8,6 +8,7 @@ import { AdminSession } from './session/admin.session';
 import { Student } from './entities/user/student';
 import { Teacher } from './entities/user/teacher';
 import { WorkerSession } from './session/worker.session';
+import { UnauthorizedSession } from './session/unauth.session';
 
 export const adminRoleName: RoleType = "admin";
 export const workerRoleName: RoleType = 'worker';
@@ -15,7 +16,7 @@ export const workerRoleName: RoleType = 'worker';
 export class SessionManager {
     initialized = false;
     private authService: AuthService = new AuthService();
-    private sessions: Map<string, ISession> = new Map();
+    private sessions: Map<string, AuthorizedSession> = new Map();
 
     constructor(private cleanupInterval: number = 60000) {
         this.startCleanupTask();
@@ -57,7 +58,7 @@ export class SessionManager {
         const token: string = authInfo[1];
         const expiresAt = this.authService.getTokenExpiredDate(token);
         
-        var session: ISession;
+        var session: AuthorizedSession;
         if (user instanceof Student) {
             session = new StudentSession(user.userId, token, expiresAt);
             this.sessions.set(token, session);
@@ -83,6 +84,10 @@ export class SessionManager {
         return [2, token];
     }
 
+    createUnauthSession() {
+        return new UnauthorizedSession(null, null, null);
+    }
+
     private createInitSession() {
         return new AdminSession(1, "aksmdksacm", new Date(), this.authService);
     }
@@ -97,7 +102,7 @@ export class SessionManager {
         const token: string = regInfo[1];
         const expiresAt = this.authService.getTokenExpiredDate(token);
         
-        var session: ISession;
+        var session: AuthorizedSession;
         if (user instanceof Student) {
             session = new StudentSession(user.userId, token, expiresAt);
             this.sessions.set(token, session);
@@ -113,7 +118,7 @@ export class SessionManager {
         return [2, token];
     }
 
-    getSession(token: string): ISession | undefined {
+    getSession(token: string): AuthorizedSession | undefined {
         if (!this.authService.isTokenValid(token)) {
             return undefined;
         }
@@ -124,7 +129,7 @@ export class SessionManager {
         return this.sessions.get(token).role
     }
 
-    private scheduleDestruction(session: ISession): void {
+    private scheduleDestruction(session: AuthorizedSession): void {
         const ttl = session.expiresAt.getTime() - Date.now();
         setTimeout(async () => {
             await session.destroy();
