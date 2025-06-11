@@ -2,13 +2,14 @@ import { Column, Entity, JoinColumn, JoinTable, ManyToMany, ManyToOne, OneToMany
 import { PointType } from "./point_type";
 import { Book } from "../books/book";
 import { RentedBook } from "../books/rented_book";
+import { PointUser } from "./point_user";
 
 @Entity()
 export class ReadingPoint {
     @PrimaryGeneratedColumn()
     pointId!: number;
 
-    @ManyToOne(() => PointType)
+    @ManyToOne(() => PointType, type => type.readingPoints)
     @JoinColumn({ name: 'typeId' })
     type!: PointType;
 
@@ -21,4 +22,7 @@ export class ReadingPoint {
 
     @OneToMany(() => RentedBook, rentedBook => rentedBook.book)
     rentedBooks?: RentedBook[];
+
+    @OneToMany(() => PointUser, point => point.user)
+    users?: PointUser[];
 }

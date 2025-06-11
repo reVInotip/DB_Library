@@ -12,9 +12,4 @@ export class TeacherSession extends BaseSession {
     async refresh(): Promise<void> {
         // Логика обновления токена
     }
-
-    // Специфичные методы для студента
-    getGrades(): Promise<any> {
-        // ...
-    }
 }

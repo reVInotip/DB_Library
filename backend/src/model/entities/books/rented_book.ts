@@ -1,4 +1,4 @@
-import { Column, Entity, JoinColumn, ManyToOne, PrimaryColumn } from "typeorm";
+import { Column, Entity, JoinColumn, ManyToOne, OneToOne, PrimaryColumn } from "typeorm";
 import { User } from "../user/user";
 import { Book } from "./book";
 import { ReadingPoint } from "../points/reading_point";
@@ -7,19 +7,25 @@ import { Status } from "./status";
 @Entity()
 export class RentedBook {
     @PrimaryColumn()
-    @ManyToOne(() => User)
+    userId!: number;
+
+    @PrimaryColumn()
+    bookId!: number;
+
+    @PrimaryColumn()
+    pointId!: number;
+
+    @ManyToOne(() => User, user => user.rentedBooks)
     @JoinColumn({ name: 'userId' })
-    user!: number;
+    user!: User;
 
-    @PrimaryColumn()
-    @ManyToOne(() => Book)
+    @OneToOne(() => Book, book => book.bookId)
     @JoinColumn({ name: 'bookId' })
-    book!: number;
-
-    @PrimaryColumn()
-    @ManyToOne(() => ReadingPoint)
+    book!: Book;
+    
+    @ManyToOne(() => ReadingPoint, point => point.rentedBooks)
     @JoinColumn({ name: 'pointId' })
-    point!: number;
+    point!: ReadingPoint;
 
     @Column({ type: 'date', nullable: true })
     rentedDate!: Date;
@@ -27,7 +33,7 @@ export class RentedBook {
     @Column({ type: 'date', nullable: true })
     expiredDate!: Date;
 
-    @ManyToOne(() => Status)
+    @ManyToOne(() => Status, status => status.rentedBooks)
     @JoinColumn({ name: 'statusId' })
     status!: Status;
 }

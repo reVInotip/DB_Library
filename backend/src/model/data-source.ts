@@ -17,7 +17,7 @@ import { PointUser } from "./entities/points/point_user";
 import { ReadingPoint } from "./entities/points/reading_point";
 import { Orders } from "./entities/books/orders";
 
-export const UserDataSource = new DataSource({
+const AppDataSource = new DataSource({
     type: "postgres",
     host: process.env.HOST || "postgres",
     port: process.env.PORT_DB ? Number(process.env.PORT_DB) : 5432,
@@ -25,14 +25,16 @@ export const UserDataSource = new DataSource({
     password: process.env.PASSWORD,
     database: process.env.DATABASE,
     migrations: ["src/migration/*.{js,ts}"],
-    synchronize: false,
+    synchronize: true,
     logging: true,
     entities: [
-        User, Title, Teacher, Student, ScientificDegree, Role, Faculty, Department, Category
+        User, Title, Teacher, Student, ScientificDegree, Role, Faculty, Department, Category, Book, RentedBook, Status, Orders, PointType, PointUser, ReadingPoint
     ]
-})
+});
 
-export const BookDataSource = new DataSource({
+export default AppDataSource;
+
+/* export const BookDataSource = new DataSource({
     type: "postgres",
     host: process.env.HOST || "postgres",
     port: process.env.PORT_DB ? Number(process.env.PORT_DB) : 5432,
@@ -60,4 +62,4 @@ export const ReadingPointDataSource = new DataSource({
     entities: [
         PointType, PointUser, ReadingPoint
     ]
-})
+}) */

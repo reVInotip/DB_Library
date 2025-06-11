@@ -1,13 +1,14 @@
-import { BookDataSource, ReadingPointDataSource, UserDataSource } from "../data-source";
-import { ReadersWithCountDto, UserInfoDto } from "../dto/user_info.dto";
-import { DebtorFilterDto, DebtorResultDto, DebtorsWithCountDto } from "../dto/debtor.dto"
+import AppDataSource from "../data-source";
+import { ReadersWithCountDto, UserDto, UserInfoDto } from "../../dto/user_info.dto";
+import { DebtorFilterDto, DebtorResultDto, DebtorsWithCountDto } from "../../dto/debtor.dto"
 import { RentedBook } from "../entities/books/rented_book";
 import { PointUser } from "../entities/points/point_user";
 import { User } from "../entities/user/user";
-import { BookPopularityDto, BookStatResultDto, BookStatsFilterDto, BookStatsResponseDto, PopularBooksFilterDto } from "../dto/books.dto";
+import { BookPopularityDto, BookStatResultDto, BookStatsFilterDto, BookStatsResponseDto, PopularBooksFilterDto } from "../../dto/books.dto";
 import { Book } from "../entities/books/book";
+import { EntityTarget } from "typeorm";
 
-export type RoleType = 'teacher' | 'student' | 'admin'
+export type RoleType = 'teacher' | 'student' | 'admin' | 'worker'
 type Status = 'Expired'
 
 export interface ISession {
@@ -22,6 +23,7 @@ export interface ISession {
     getReadersByReadingPoint(pointId: number, userInfoDto: UserInfoDto): Promise<ReadersWithCountDto>;
     getDebtors(filters: DebtorFilterDto): Promise<DebtorsWithCountDto>;
     getPopularBooks(filter: PopularBooksFilterDto): Promise<BookPopularityDto[]>;
+    //createNewUser(userData: UserDto): Promise<[number, string]>;
 }
   
 // Базовый класс для всех сессий
@@ -38,9 +40,44 @@ export abstract class BaseSession implements ISession {
         this.expiresAt = expiresAt;
     }
 
+    async create<T>(entity: EntityTarget<T>, data: any): Promise<number> {
+        const result = await AppDataSource.getRepository(entity).insert(data);
+        if (result.identifiers == null) {
+            return 1;
+        }
+
+        return 0;
+    }
+
+    async find<T>(entity: EntityTarget<T>, data: any): Promise<T | null> {
+        return await AppDataSource.getRepository(entity).findOneBy(data);
+    }
+
+    async getAll<T>(entity: EntityTarget<T>): Promise<T[]> {
+        return await AppDataSource.getRepository(entity).find();
+    }
+
+    async delete<T>(entity: EntityTarget<T>, id: number): Promise<number> {
+        const result = await AppDataSource.getRepository(entity).delete(id);
+        if (result.affected == null || result.affected != 1) {
+            return 1;
+        }
+
+        return 0;
+    }
+
+    async update<T>(entity: EntityTarget<T>, id: number, data: any): Promise<number> {
+        const result = await AppDataSource.getRepository(entity).update(id, data);
+        if (result.affected == null || result.affected != 1) {
+            return 1;
+        }
+
+        return 0;
+    }
+
     async getReadersByReadingPoint(pointId: number, userInfoDto: UserInfoDto): Promise<ReadersWithCountDto> {
         // Основной запрос для получения данных о читателях
-        const query = ReadingPointDataSource.getRepository(PointUser)
+        const query = AppDataSource.getRepository(PointUser)
             .createQueryBuilder('pu')
             .select([
                 'u.userId as userId',
@@ -61,7 +98,7 @@ export abstract class BaseSession implements ISession {
             .where('pu.pointId = :pointId', { pointId });
 
         // Создаем копию запроса для подсчета общего количества
-        const countQuery = ReadingPointDataSource.getRepository(PointUser)
+        const countQuery = AppDataSource.getRepository(PointUser)
             .createQueryBuilder('pu')
             .select('COUNT(DISTINCT u.userId)', 'count')
             .leftJoin('pu.user', 'u')
@@ -106,7 +143,7 @@ export abstract class BaseSession implements ISession {
     }
 
     async getDebtors(filters: DebtorFilterDto): Promise<DebtorsWithCountDto> {
-        const mainQuery = UserDataSource.getRepository(User).createQueryBuilder('user')
+        const mainQuery = AppDataSource.getRepository(User).createQueryBuilder('user')
             .select([
                 'user.user_id as "userId"',
                 'user.username as "username"',
@@ -173,7 +210,7 @@ export abstract class BaseSession implements ISession {
 
 
     async getPopularBooks(filter: PopularBooksFilterDto): Promise<BookPopularityDto[]> {
-      const query = BookDataSource.getRepository(Book)
+      const query = AppDataSource.getRepository(Book)
           .createQueryBuilder('book')
           .select([
               'book.book_id as "bookId"',
@@ -206,7 +243,7 @@ export abstract class BaseSession implements ISession {
     }
 
     async getBookStats(filter: BookStatsFilterDto): Promise<BookStatsResponseDto> {
-        const bookRepo = BookDataSource.getRepository(Book);
+        const bookRepo = AppDataSource.getRepository(Book);
         const baseQuery = bookRepo.createQueryBuilder('b')
             .select([
                 'b.book_id as "bookId"',
@@ -271,4 +308,5 @@ export abstract class BaseSession implements ISession {
 
     abstract destroy(): Promise<void>;
     abstract refresh(): Promise<void>;
+    //abstract createNewUser(userData: UserDto): Promise<[number, string]>;
 }

@@ -4,9 +4,11 @@ import { Book } from "./book";
 @Entity()
 export class Orders {
     @PrimaryColumn()
-    @OneToOne(() => Book)
+    bookId!: number;
+
+    @OneToOne(() => Book, book => book.bookId)
     @JoinColumn({ name: 'bookId' })
-    book!: number;
+    book!: Book;
 
     @Column()
     phoneNumber!: string;

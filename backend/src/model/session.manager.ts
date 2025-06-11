@@ -1,15 +1,44 @@
-import { ISession } from './session/session.interface';
+import { ISession, RoleType } from './session/session.interface';
 import { AuthService } from './auth/auth.service';
 import { User } from './entities/user/user';
 import { StudentSession } from './session/student.session';
 import { TeacherSession } from './session/teacher.session';
+import { UserDto } from '../dto/user_info.dto';
+import { AdminSession } from './session/admin.session';
+import { Student } from './entities/user/student';
+import { Teacher } from './entities/user/teacher';
+import { WorkerSession } from './session/worker.session';
+
+export const adminRoleName: RoleType = "admin";
+export const workerRoleName: RoleType = 'worker';
 
 export class SessionManager {
+    initialized = false;
     private authService: AuthService = new AuthService();
     private sessions: Map<string, ISession> = new Map();
 
     constructor(private cleanupInterval: number = 60000) {
         this.startCleanupTask();
+    }
+
+    async init() {
+        // create init admin session
+        const initSession: AdminSession = this.createInitSession();
+        await initSession.createRole(adminRoleName);
+
+        const role = await initSession.findRole(adminRoleName);
+        const result = await initSession.createUser({
+            name: process.env.USERNAME,
+            secondName: "",
+            patronymic: "",
+            email: "aboba@mail.ru",
+            password: process.env.PASSWORD,
+            roleId: role.roleId
+        });
+
+        if (result != 0) {
+            throw new Error("can not create default user");
+        }
     }
 
     /**
@@ -18,10 +47,10 @@ export class SessionManager {
      * @param password 
      * @returns Promise<0> if all is Ok, Promise<1> if authentication failed, Promise<2> if internal error occurred
      */
-    async createSession(email: string, password: string): Promise<number> {
-        const authInfo: [User, string] | null = await this.authService.authenticate(email, password);
+    async createSession(email: string, password: string, role: string): Promise<[number, string]> {
+        const authInfo: [User, string] | null = await this.authService.authenticate(email, password, role);
         if (authInfo == null) {
-            return 1;
+            return [1, null];
         }
 
         const user: User = authInfo[0];
@@ -29,23 +58,65 @@ export class SessionManager {
         const expiresAt = this.authService.getTokenExpiredDate(token);
         
         var session: ISession;
-        switch (user.role.roleName) {
-        case 'student':
+        if (user instanceof Student) {
             session = new StudentSession(user.userId, token, expiresAt);
-            this.sessions.set(token, new StudentSession(user.userId, token, expiresAt));
+            this.sessions.set(token, session);
             this.scheduleDestruction(session);
-            return 0;
-        case 'teacher':
+            return [0, token];
+        } else if (user instanceof Teacher) {
             session = new TeacherSession(user.userId, token, expiresAt);
-            this.sessions.set(token, new TeacherSession(user.userId, token, expiresAt));
+            this.sessions.set(token, session);
             this.scheduleDestruction(session);
-            return 0;
-        default:
-            return 2;
+            return [0, token];
+        } else if (user.role.roleName == adminRoleName) {
+            session = new AdminSession(user.userId, token, expiresAt, this.authService);
+            this.sessions.set(token, session);
+            this.scheduleDestruction(session);
+            return [0, token];
+        } else if (user.role.roleName == workerRoleName) {
+            session = new WorkerSession(user.userId, token, expiresAt);
+            this.sessions.set(token, session);
+            this.scheduleDestruction(session);
+            return [0, token];
         }
+
+        return [2, token];
+    }
+
+    private createInitSession() {
+        return new AdminSession(1, "aksmdksacm", new Date(), this.authService);
+    }
+
+    async registerNewUser(userData: UserDto): Promise<[number, string]> {
+        const regInfo: [User, string] | null = await this.authService.register(userData);
+        if (regInfo == null) {
+            return [1, null];
+        }
+
+        const user: User = regInfo[0];
+        const token: string = regInfo[1];
+        const expiresAt = this.authService.getTokenExpiredDate(token);
+        
+        var session: ISession;
+        if (user instanceof Student) {
+            session = new StudentSession(user.userId, token, expiresAt);
+            this.sessions.set(token, session);
+            this.scheduleDestruction(session);
+            return [0, token];
+        } else if (user instanceof Teacher) {
+            session = new TeacherSession(user.userId, token, expiresAt);
+            this.sessions.set(token, session);
+            this.scheduleDestruction(session);
+            return [0, token];
+        }
+
+        return [2, token];
     }
 
     getSession(token: string): ISession | undefined {
+        if (!this.authService.isTokenValid(token)) {
+            return undefined;
+        }
         return this.sessions.get(token);
     }
 
@@ -56,8 +127,8 @@ export class SessionManager {
     private scheduleDestruction(session: ISession): void {
         const ttl = session.expiresAt.getTime() - Date.now();
         setTimeout(async () => {
-        await session.destroy();
-        this.sessions.delete(session.token);
+            await session.destroy();
+            this.sessions.delete(session.token);
         }, ttl);
     }
 
@@ -73,3 +144,7 @@ export class SessionManager {
         }, this.cleanupInterval);
     }
 }
+
+const manager = new SessionManager();
+
+export default manager;

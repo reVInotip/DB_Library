@@ -4,7 +4,7 @@ import { Faculty } from './faculty';
 
 @ChildEntity()
 export class Student extends User {
-  @ManyToOne(() => Faculty)
+  @ManyToOne(() => Faculty, faculty => faculty.students)
   @JoinColumn({ name: 'facultyId' })
   faculty!: Faculty;
 

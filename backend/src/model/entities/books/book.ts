@@ -26,7 +26,4 @@ export class Book {
 
   @Column('boolean')
   fromAnotherLib!: boolean;
-
-  @OneToMany(() => RentedBook, rentedBook => rentedBook.book)
-  rentedBooks!: RentedBook[];
 }

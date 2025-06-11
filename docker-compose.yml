@@ -10,7 +10,6 @@ services:
       - ${PG_PORT}:${PG_PORT}
     volumes:
       - postgres:/var/lib/postgresql/data
-      - ./docker-entrypoint-initdb.d:/docker-entrypoint-initdb.d
     healthcheck:
       test:
         [
@@ -27,6 +26,22 @@ services:
         limits:
           memory: 8G
           cpus: '4.0'
+  
+  backend:
+    build: ./backend
+    restart: always
+    ports:
+      - 8080:8080
+    environment:
+      - HOST=postgres
+      - PORT_DB=${PG_PORT}
+      - USERNAME=${PG_USER}
+      - PASSWORD=${PG_PASSWORD}
+      - DATABASE=${PG_DATABASE}
+    dns:
+      - 77.88.8.8
+    depends_on:
+      - postgres
 
 volumes:
   postgres:

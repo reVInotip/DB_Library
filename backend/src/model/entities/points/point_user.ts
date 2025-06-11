@@ -5,12 +5,16 @@ import { ReadingPoint } from "./reading_point";
 @Entity()
 export class PointUser {
     @PrimaryColumn()
-    @ManyToOne(() => User)
-    @JoinColumn({ name: 'userId' })
-    userId!: User;
+    userId!: number;
 
     @PrimaryColumn()
-    @ManyToOne(() => ReadingPoint)
+    pointId!: number;
+
+    @ManyToOne(() => User, user => user.points)
+    @JoinColumn({ name: 'userId' })
+    user!: User;
+
+    @ManyToOne(() => ReadingPoint, point => point.users)
     @JoinColumn({ name: 'pointId' })
     readingPoint!: ReadingPoint;
 
