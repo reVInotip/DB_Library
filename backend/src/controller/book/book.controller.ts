@@ -1,7 +1,7 @@
 import { Response } from 'express';
 import manager, { SessionManager } from '../../model/session.manager';
 import { AuthRequest } from '../auth/auth_request';
-import { ISession } from '../../model/session/session.interface';
+import { BaseSession, ISession } from '../../model/session/session.interface';
 import { SuperuserSession } from '../../model/session/superuser.asession';
 import { AuthorizedSession } from '../../model/session/authorized.assession';
 
@@ -188,6 +188,24 @@ export class BookController {
         } catch (error) {
             res.status(500).json({
                 message: error instanceof Error ? error.message : 'Book deletion error'
+            });
+        }
+    }
+
+
+    async getPopularBooks(req: AuthRequest, res: Response) {
+        try {
+            const session = <BaseSession> req.session;
+            const result = await session.getPopularBooks(req.body);
+            
+            if (result == null) {
+                return res.status(400).json({ message: 'Get popular books failed' });
+            }
+            
+            res.json(result);
+        } catch (error) {
+            res.status(500).json({
+                message: error instanceof Error ? error.message : 'Get popular books error'
             });
         }
     }

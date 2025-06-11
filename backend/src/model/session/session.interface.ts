@@ -127,6 +127,39 @@ export abstract class BaseSession implements ISession {
         );
     }
 
+    async getPopularBooks(filter: PopularBooksFilterDto): Promise<BookPopularityDto[]> {
+        const query = AppDataSource.getRepository(Book)
+            .createQueryBuilder('book')
+            .select([
+                'book.bookId as "bookId"',
+                'book.title as "title"',
+                'book.author as "author"',
+                'COUNT(rb.bookId)::INTEGER as "totalOrders"'
+            ])
+            .innerJoin(RentedBook, 'rb', 'rb.bookId = book.bookId')
+            .groupBy('book.bookId, book.title, book.author')
+            .orderBy('"totalOrders"', 'DESC')
+            .limit(20);
+
+        if (filter.universityWide) {
+            // Для всего вуза не применяем фильтры по точке и факультету
+            return query.getRawMany<BookPopularityDto>();
+        }
+
+        if (filter.pointId) {
+            query.andWhere('rb.pointId = :pointId', { pointId: filter.pointId });
+        }
+
+        if (filter.facultyId) {
+            query
+                .innerJoin(User, 'u', 'u.userId = rb.userId')
+                .innerJoin(Student, 's', 's.userId = u.userId')
+                .andWhere('s.facultyId = :facultyId', { facultyId: filter.facultyId });
+        }
+
+        return await query.getRawMany<BookPopularityDto>();
+    }
+
     abstract destroy(): Promise<void>;
     abstract refresh(): Promise<void>;
     //abstract createNewUser(userData: UserDto): Promise<[number, string]>;

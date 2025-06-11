@@ -9,6 +9,8 @@ router.get('/rented', authController.authenticateJWT, rentedBookController.find.
 router.post('/rented', authController.authenticateJWT, rentedBookController.create.bind(rentedBookController));
 router.delete('/rented/:userId/:bookId/:pointId', authController.authenticateJWT, rentedBookController.delete.bind(rentedBookController));
 
+router.get('/popular', authController.authHook, bookController.getPopularBooks.bind(bookController));
+
 router.put('/', authController.authenticateJWT, bookController.find.bind(bookController));
 router.get('/:id', authController.authenticateJWT, bookController.getById.bind(bookController));
 router.post('/', authController.authenticateJWT, bookController.create.bind(bookController));

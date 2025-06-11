@@ -205,40 +205,6 @@ export abstract class AuthorizedSession extends BaseSession {
         );
     }
 
-
-    async getPopularBooks(filter: PopularBooksFilterDto): Promise<BookPopularityDto[]> {
-      const query = AppDataSource.getRepository(Book)
-          .createQueryBuilder('book')
-          .select([
-              'book.book_id as "bookId"',
-              'book.title as "title"',
-              'book.author as "author"',
-              'COUNT(rb.book_id)::INTEGER as "totalOrders"'
-          ])
-          .innerJoin('rented_books', 'rb', 'rb.book_id = book.book_id')
-          .groupBy('book.book_id, book.title, book.author')
-          .orderBy('"totalOrders"', 'DESC')
-          .limit(20);
-
-      if (filter.universityWide) {
-          // Для всего вуза не применяем фильтры по точке и факультету
-          return query.getRawMany<BookPopularityDto>();
-      }
-
-      if (filter.pointId) {
-          query.andWhere('rb.point_id = :pointId', { pointId: filter.pointId });
-      }
-
-      if (filter.facultyId) {
-          query
-              .innerJoin('users', 'u', 'u.user_id = rb.user_id')
-              .innerJoin('student', 's', 's.user_id = u.user_id')
-              .andWhere('s.faculty_id = :facultyId', { facultyId: filter.facultyId });
-      }
-
-      return await query.getRawMany<BookPopularityDto>();
-    }
-
     async getBookStats(filter: BookStatsFilterDto): Promise<BookStatsResponseDto> {
         const bookRepo = AppDataSource.getRepository(Book);
         const baseQuery = bookRepo.createQueryBuilder('b')
