@@ -16,6 +16,7 @@ import { BookStatResultDto, BookStatsFilterDto, BookStatsResponseDto, RentedBook
 import { Status } from "../entities/books/status";
 import { User } from "../entities/user/user";
 import { ReadingPointStats } from "../../dto/reading_point.dto";
+import { Orders } from "../entities/books/orders";
 
 export abstract class SuperuserSession extends AuthorizedSession {
     constructor(userId: number, role: RoleType, token: string, expiresAt: Date) {
@@ -531,6 +532,64 @@ export abstract class SuperuserSession extends AuthorizedSession {
             leastPopularPoint: leastPopularPoint || null,
             mostDebtorsPoint: mostDebtorsPoint || null,
             highestDebtPoint: highestDebtPoint || null
+        };
+    }
+
+    private calculateStartDate(period: 'month' | 'semester' | 'year'): Date {
+        const now = new Date();
+        switch (period) {
+            case 'month': return new Date(now.setMonth(now.getMonth() - 1));
+            case 'semester': return new Date(now.setMonth(now.getMonth() - 6));
+            case 'year': return new Date(now.setFullYear(now.getFullYear() - 1));
+            default: throw new Error('Invalid period');
+        }
+    }
+
+    async getInterlibraryOrders(filters: {
+        period?: 'month' | 'semester' | 'year';
+        bookTitle?: string;
+        author?: string;
+        minCost?: number;
+        maxCost?: number;
+    }) {
+        // Базовый запрос
+        const queryBuilder = AppDataSource.getRepository(Orders)
+            .createQueryBuilder('order')
+            .leftJoinAndSelect('order.book', 'book')
+            .where('book.fromAnotherLib = :fromAnotherLib', { fromAnotherLib: true });
+
+        // Период
+        if (filters.period) {
+            const startDate = this.calculateStartDate(filters.period);
+            queryBuilder.andWhere('order.orderDate >= :startDate', { startDate });
+        }
+
+        // Дополнительные фильтры
+        if (filters.bookTitle) {
+            queryBuilder.andWhere('book.title LIKE :title', { title: `%${filters.bookTitle}%` });
+        }
+
+        if (filters.author) {
+            queryBuilder.andWhere('book.author LIKE :author', { author: `%${filters.author}%` });
+        }
+
+        if (filters.minCost !== undefined) {
+            queryBuilder.andWhere('book.cost >= :minCost', { minCost: filters.minCost });
+        }
+
+        if (filters.maxCost !== undefined) {
+            queryBuilder.andWhere('book.cost <= :maxCost', { maxCost: filters.maxCost });
+        }
+
+        // Выполнение запроса
+        const [orders, totalCount] = await Promise.all([
+            queryBuilder.getMany(),
+            queryBuilder.getCount()
+        ]);
+
+        return {
+            books: orders.map(order => order.book),
+            totalCount
         };
     }
 }

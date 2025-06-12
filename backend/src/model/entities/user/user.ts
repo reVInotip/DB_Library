@@ -4,6 +4,7 @@ import { Category } from './category';
 import { RentedBook } from '../books/rented_book';
 import { ReadingPoint } from '../points/reading_point';
 import { PointUser } from '../points/point_user';
+import { Orders } from '../books/orders';
 
 @Entity()
 @TableInheritance({ column: { type: 'varchar', name: 'type' } })
@@ -43,4 +44,7 @@ export class User {
 
   @OneToMany(() => PointUser, point => point.user)
   points?: PointUser[];
+
+  @OneToMany(() => Orders, order => order.user)
+  orders?: Orders[];
 }

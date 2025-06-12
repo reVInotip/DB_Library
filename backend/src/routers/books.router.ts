@@ -2,6 +2,7 @@ import express from 'express';
 import { authController } from '../controller/auth/auth.controller';
 import { bookController } from '../controller/book/book.controller';
 import { rentedBookController } from '../controller/book/rented_book.controller';
+import { ordersController } from '../controller/book/orders.controller';
 
 const router = express.Router();
 
@@ -10,6 +11,13 @@ router.post('/rented', authController.authenticateJWT, rentedBookController.crea
 router.delete('/rented/:userId/:bookId/:pointId', authController.authenticateJWT, rentedBookController.delete.bind(rentedBookController));
 router.patch('/rented/:userId/:bookId/:pointId', authController.authenticateJWT, rentedBookController.changeStatus.bind(rentedBookController));
 router.put('/rented/:userId/:bookId/:pointId', authController.authenticateJWT, rentedBookController.update.bind(rentedBookController));
+
+router.post('/order/', authController.authenticateJWT, ordersController.create.bind(ordersController));
+router.put('/order/:bookId/:userId', authController.authenticateJWT, ordersController.update.bind(ordersController));
+router.delete('/order/:bookId/:userId', authController.authenticateJWT, ordersController.delete.bind(ordersController));
+router.get('/order/', authController.authenticateJWT, ordersController.getAll.bind(ordersController));
+router.get('/order/:bookId/:userId', authController.authenticateJWT, ordersController.getById.bind(ordersController));
+router.get('/order/interLib', authController.authenticateJWT, ordersController.getInterlibraryOrders.bind(ordersController));
 
 router.get('/popular', authController.authHook, bookController.getPopularBooks.bind(bookController));
 router.get('/stats', authController.authenticateJWT, bookController.getBookStats.bind(bookController));

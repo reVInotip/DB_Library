@@ -10,6 +10,7 @@ import { BaseSession, RoleType } from "./session.interface";
 import { RentedBook } from "../entities/books/rented_book";
 import { Status } from "../entities/books/status";
 import { QueryDeepPartialEntity } from "typeorm/query-builder/QueryPartialEntity";
+import { Orders } from "../entities/books/orders";
 
 export abstract class AuthorizedSession extends BaseSession {
     constructor(userId: number, role: RoleType, token: string, expiresAt: Date) {
@@ -352,6 +353,82 @@ export abstract class AuthorizedSession extends BaseSession {
             return result.affected ? 0 : 1;
         } catch (error) {
             console.error('Update RentedBook error:', error);
+            return 1;
+        }
+    }
+
+    async createOrder(orderData: {
+        bookId: number;
+        userId: number;
+        phoneNumber: string;
+        orderDate?: Date;
+    }): Promise<number> {
+        try {
+            // Проверяем существование книги и пользователя
+            const [book, user] = await Promise.all([
+                AppDataSource.getRepository(Book).findOneBy({ bookId: orderData.bookId }),
+                AppDataSource.getRepository(User).findOneBy({ userId: orderData.userId })
+            ]);
+            
+            if (!book || !user) {
+                return 1; // Книга или пользователь не найдены
+            }
+
+            const order = new Orders();
+            order.book = book;
+            order.user = user;
+            order.phoneNumber = orderData.phoneNumber;
+            order.orderDate = orderData.orderDate || new Date();
+
+            await AppDataSource.getRepository(Orders).save(order);
+            return 0; // Успех
+        } catch (error) {
+            console.error('Create order error:', error);
+            return 1; // Ошибка
+        }
+    }
+
+    async getOrder(bookId: number, userId: number): Promise<Orders | null> {
+        return AppDataSource.getRepository(Orders).findOne({
+            where: { bookId, userId },
+            relations: ['book', 'user']
+        });
+    }
+
+    async getAllOrders(): Promise<Orders[]> {
+        return AppDataSource.getRepository(Orders).find({
+            relations: ['book', 'user'],
+            order: { orderDate: 'DESC' }
+        });
+    }
+
+    async updateOrder(
+        bookId: number,
+        userId: number,
+        updateData: {
+            phoneNumber?: string;
+            orderDate?: Date;
+        }
+    ): Promise<number> {
+        try {
+            const result = await AppDataSource.getRepository(Orders).update(
+                { bookId, userId },
+                updateData
+            );
+            
+            return result.affected ? 0 : 1;
+        } catch (error) {
+            console.error('Update order error:', error);
+            return 1;
+        }
+    }
+
+    async deleteOrder(bookId: number, userId: number): Promise<number> {
+        try {
+            const result = await AppDataSource.getRepository(Orders).delete({ bookId, userId });
+            return result.affected ? 0 : 1;
+        } catch (error) {
+            console.error('Delete order error:', error);
             return 1;
         }
     }
