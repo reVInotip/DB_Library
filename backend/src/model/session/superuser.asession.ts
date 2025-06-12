@@ -1,4 +1,4 @@
-import { In, Not, IsNull } from "typeorm";
+import { In, Not, IsNull, Between, FindOptionsWhere } from "typeorm";
 import { DebtorFilterDto, DebtorsWithCountDto } from "../../dto/debtor.dto";
 import { UserInfoDto, ReadersWithCountDto } from "../../dto/user_info.dto";
 import AppDataSource from "../data-source";
@@ -12,6 +12,10 @@ import { Student } from "../entities/user/student";
 import { Teacher } from "../entities/user/teacher";
 import { RoleType } from "./session.interface";
 import { AuthorizedSession } from "./authorized.assession";
+import { BookStatResultDto, BookStatsFilterDto, BookStatsResponseDto, RentedBookSearchCriteria } from "../../dto/books.dto";
+import { Status } from "../entities/books/status";
+import { User } from "../entities/user/user";
+import { ReadingPointStats } from "../../dto/reading_point.dto";
 
 export abstract class SuperuserSession extends AuthorizedSession {
     constructor(userId: number, role: RoleType, token: string, expiresAt: Date) {
@@ -64,8 +68,11 @@ export abstract class SuperuserSession extends AuthorizedSession {
         cost: number;
         fromAnotherLib: boolean;
         lostDate?: Date;
+        pointId: number;
     }): Promise<number> {
         try {
+            const point = await this.getReadingPointById(bookData.pointId);
+            if (!point) return 1;
             return this.create(Book, {
                 title: bookData.title,
                 author: bookData.author,
@@ -73,7 +80,8 @@ export abstract class SuperuserSession extends AuthorizedSession {
                 admissionDate: bookData.admissionDate,
                 cost: bookData.cost,
                 fromAnotherLib: bookData.fromAnotherLib,
-                lostDate: bookData.lostDate
+                lostDate: bookData.lostDate,
+                point: point
             });
         } catch (error) {
             console.error('Create book error:', error);
@@ -113,15 +121,32 @@ export abstract class SuperuserSession extends AuthorizedSession {
             cost?: number;
             fromAnotherLib?: boolean;
             lostDate?: Date | null;
+            pointId?: number;
         }
     ): Promise<number> {
         try {
+            const updateObj: any = {};
+
+            if (updateData.pointId !== undefined) {
+                const point = await this.getReadingPointById(updateData.pointId);
+                if (!point) return 1;
+                updateObj.point = point;
+            }
+
+            updateObj.title = updateData.title;
+            updateObj.author = updateData.author;
+            updateObj.releaseDate = updateData.releaseDate;
+            updateObj.admissionDate = updateData.admissionDate;
+            updateObj.cost = updateData.cost;
+            updateObj.fromAnotherLib = updateData.fromAnotherLib;
+            updateObj.lostDate = updateData.lostDate;
+            
             // Обработка специального случая для сброса lostDate
             if (updateData.lostDate === null) {
                 return this.update(Book, { bookId }, { lostDate: null });
             }
             
-            return this.update(Book, { bookId }, updateData);
+            return this.update(Book, { bookId }, updateObj);
         } catch (error) {
             console.error('Update book error:', error);
             return 1;
@@ -350,6 +375,162 @@ export abstract class SuperuserSession extends AuthorizedSession {
         return {
             debtors: formattedDebtors,
             totalCount: parseInt(countResult?.count || '0', 10)
+        };
+    }
+
+    async getBookStats(filter: BookStatsFilterDto): Promise<BookStatsResponseDto> {
+        const bookRepo = AppDataSource.getRepository(Book);
+        const baseQuery = bookRepo.createQueryBuilder('b')
+            .select([
+                'b.bookId as "bookId"',
+                'b.title as "title"',
+                'b.author as "author"',
+                'b.releaseDate as "releaseDate"',
+                'b.admissionDate as "admissionDate"',
+                'b.lostDate as "lostDate"',
+                `CASE 
+                    WHEN b.lostDate IS NOT NULL AND b.lostDate >= CURRENT_DATE - INTERVAL '1 year' THEN 'Утеряна'
+                    ELSE 'Поступила'
+                END as "status"`
+            ])
+            .where(`(b.admissionDate >= CURRENT_DATE - INTERVAL '1 year' 
+                    OR (b.lostDate IS NOT NULL AND b.lostDate >= CURRENT_DATE - INTERVAL '1 year'))`);
+
+        // Фильтр по читальному залу с использованием сущности ReadingPoint
+        if (filter.pointId && !filter.libraryWide) {
+            baseQuery.innerJoin(
+                'b.point', 
+                'rp', 
+                'rp.pointId = :pointId', 
+                { pointId: filter.pointId }
+            );
+        }
+
+        // Фильтр по абоненту через сущность RentedBook
+        if (filter.userId) {
+            baseQuery.andWhere('rp.pointId = :pointId', { pointId: filter.pointId });
+        }
+
+        // Общие фильтры
+        if (filter.author) {
+            baseQuery.andWhere('b.author ILIKE :author', { author: `%${filter.author}%` });
+        }
+
+        if (filter.releaseYear) {
+            baseQuery.andWhere('EXTRACT(YEAR FROM b.releaseDate) = :releaseYear', 
+                            { releaseYear: filter.releaseYear });
+        }
+
+        if (filter.admissionYear) {
+            baseQuery.andWhere('EXTRACT(YEAR FROM b.admissionDate) = :admissionYear', 
+                            { admissionYear: filter.admissionYear });
+        }
+
+        // Запрос для подсчета статистики
+        const countQuery = baseQuery.clone()
+            .select([
+                `SUM(CASE WHEN b.admissionDate >= CURRENT_DATE - INTERVAL '1 year' THEN 1 ELSE 0 END) as "received"`,
+                `SUM(CASE WHEN b.lostDate IS NOT NULL AND b.lostDate >= CURRENT_DATE - INTERVAL '1 year' THEN 1 ELSE 0 END) as "lost"`
+            ]);
+
+        const [books, counts] = await Promise.all([
+            baseQuery.getRawMany<BookStatResultDto>(),
+            countQuery.getRawOne<{ received: string, lost: string }>()
+        ]);
+
+        return {
+            books,
+            totalReceived: parseInt(counts?.received || '0', 10),
+            totalLost: parseInt(counts?.lost || '0', 10)
+        };
+    }
+
+    async getReadingPointsStats(): Promise<{
+        mostPopularPoint: ReadingPointStats;
+        leastPopularPoint: ReadingPointStats;
+        mostDebtorsPoint: ReadingPointStats;
+        highestDebtPoint: ReadingPointStats;
+    }> {
+        // 1. Пункт с наибольшим числом читателей
+        const mostPopularQuery = AppDataSource.getRepository(ReadingPoint)
+            .createQueryBuilder('rp')
+            .select([
+                'rp.pointId as "pointId"',
+                'rp.address as "address"',
+                'COUNT(DISTINCT pu.userId) as "readerCount"'
+            ])
+            .leftJoin('rp.users', 'pu')
+            .groupBy('rp.pointId, rp.address')
+            .orderBy('"readerCount"', 'DESC')
+            .limit(1)
+            .getRawOne();
+
+        // 2. Пункт с наименьшим числом читателей
+        const leastPopularQuery = AppDataSource.getRepository(ReadingPoint)
+            .createQueryBuilder('rp')
+            .select([
+                'rp.pointId as "pointId"',
+                'rp.address as "address"',
+                'COUNT(DISTINCT pu.userId) as "readerCount"'
+            ])
+            .leftJoin('rp.users', 'pu')
+            .groupBy('rp.pointId, rp.address')
+            .orderBy('"readerCount"', 'ASC')
+            .limit(1)
+            .getRawOne();
+
+        // 3. Пункт с наибольшим числом задолжников
+        const mostDebtorsQuery = AppDataSource.getRepository(ReadingPoint)
+            .createQueryBuilder('rp')
+            .select([
+                'rp.pointId as "pointId"',
+                'rp.address as "address"',
+                'COUNT(DISTINCT rb.userId) as "debtorCount"'
+            ])
+            .leftJoin('rp.rentedBooks', 'rb')
+            .leftJoin('rb.status', 'status')
+            .where('status.statusName = :statusName', { statusName: 'Expired' })
+            .andWhere('rb.expiredDate < CURRENT_DATE')
+            .groupBy('rp.pointId, rp.address')
+            .orderBy('"debtorCount"', 'DESC')
+            .limit(1)
+            .getRawOne();
+
+        // 4. Пункт с наибольшей суммой задолженности
+        const highestDebtQuery = AppDataSource.getRepository(ReadingPoint)
+            .createQueryBuilder('rp')
+            .select([
+                'rp.pointId as "pointId"',
+                'rp.address as "address"',
+                'SUM(b.cost) as "totalDebt"'
+            ])
+            .leftJoin('rp.rentedBooks', 'rb')
+            .leftJoin('rb.book', 'b')
+            .leftJoin('rb.status', 'status')
+            .where('status.statusName = :statusName', { statusName: 'Expired' })
+            .andWhere('rb.expiredDate < CURRENT_DATE')
+            .groupBy('rp.pointId, rp.address')
+            .orderBy('"totalDebt"', 'DESC')
+            .limit(1)
+            .getRawOne();
+
+        const [
+            mostPopularPoint,
+            leastPopularPoint,
+            mostDebtorsPoint,
+            highestDebtPoint
+        ] = await Promise.all([
+            mostPopularQuery,
+            leastPopularQuery,
+            mostDebtorsQuery,
+            highestDebtQuery
+        ]);
+
+        return {
+            mostPopularPoint: mostPopularPoint || null,
+            leastPopularPoint: leastPopularPoint || null,
+            mostDebtorsPoint: mostDebtorsPoint || null,
+            highestDebtPoint: highestDebtPoint || null
         };
     }
 }

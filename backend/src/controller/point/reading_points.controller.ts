@@ -60,7 +60,7 @@ export class ReadingPointController {
     async getByType(req: AuthRequest, res: Response) {
         try {
             const session = req.session;
-            const readingPoints = await session.getReadingPointsByType(Number.parseInt(req.params.typeId));
+            const readingPoints = await session.getReadingPointsByType(Number(req.params.typeId));
             res.json(readingPoints);
         } catch (error) {
             res.status(500).json({
@@ -71,7 +71,7 @@ export class ReadingPointController {
 
     async getById(req: AuthRequest, res: Response) {
         const session = req.session;
-        const result = await session.getReadingPointById(Number.parseInt(req.params.id));
+        const result = await session.getReadingPointById(Number(req.params.id));
         if (result == null) {
             res.status(404).json({ message: 'Request failed' }).send();
             return;
@@ -86,7 +86,7 @@ export class ReadingPointController {
         }
 
         try {
-            const id = parseInt(req.params.id);
+            const id = Number(req.params.id);
             const adminSession = <AdminSession> req.session;
             const result = await adminSession.updateReadingPoint(id, (req.body.typeId, req.body.address, req.body.bookIds));
             
@@ -108,7 +108,7 @@ export class ReadingPointController {
         }
 
         try {
-            const id = parseInt(req.params.id);
+            const id = Number(req.params.id);
             const adminSession = <AdminSession> req.session;
             const result = await adminSession.deleteReadingPoint(id);
             
@@ -131,7 +131,28 @@ export class ReadingPointController {
 
         try {
             const session = <SuperuserSession> req.session;
-            const result = await session.getReadersByReadingPoint(Number.parseInt(req.params.id), req.body);
+            const result = await session.getReadersByReadingPoint(Number(req.params.id), req.body);
+
+            if (result == null) {
+                return res.status(400).json({ message: 'Get failed' });
+            }
+            
+            res.json(result);
+        } catch (error) {
+            res.status(500).json({
+                message: error instanceof Error ? error.message : 'Get error'
+            });
+        }
+    }
+
+    async getReadingPointsStats(req: AuthRequest, res: Response) {
+        if (this.checkAvailableRoles(req.session) > 1) {
+            return res.status(401).json({ message: 'Access denied' });
+        }
+
+        try {
+            const session = <SuperuserSession> req.session;
+            const result = await session.getReadingPointsStats();
 
             if (result == null) {
                 return res.status(400).json({ message: 'Get failed' });

@@ -61,6 +61,7 @@ export class BookSearchCriteria {
     maxCost?: number;
     fromAnotherLib?: boolean;
     isLost?: boolean;
+    pointId?: number
 }
 
 export class RentedBookSearchCriteria {

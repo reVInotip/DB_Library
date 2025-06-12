@@ -9,6 +9,7 @@ import { User } from "../entities/user/user";
 import { BaseSession, RoleType } from "./session.interface";
 import { RentedBook } from "../entities/books/rented_book";
 import { Status } from "../entities/books/status";
+import { QueryDeepPartialEntity } from "typeorm/query-builder/QueryPartialEntity";
 
 export abstract class AuthorizedSession extends BaseSession {
     constructor(userId: number, role: RoleType, token: string, expiresAt: Date) {
@@ -53,6 +54,12 @@ export abstract class AuthorizedSession extends BaseSession {
         
         if (criteria.isLost !== undefined) {
             where.lostDate = criteria.isLost ? Not(IsNull()) : IsNull();
+        }
+
+        if (criteria.pointId !== undefined) {
+            const point = await this.getReadingPointById(criteria.pointId);
+            if (!point) return null;
+            where.point = point;
         }
         
         return this.getAll(Book, [], { where });
@@ -205,70 +212,6 @@ export abstract class AuthorizedSession extends BaseSession {
         );
     }
 
-    async getBookStats(filter: BookStatsFilterDto): Promise<BookStatsResponseDto> {
-        const bookRepo = AppDataSource.getRepository(Book);
-        const baseQuery = bookRepo.createQueryBuilder('b')
-            .select([
-                'b.book_id as "bookId"',
-                'b.title as "title"',
-                'b.author as "author"',
-                'b.release_date as "releaseDate"',
-                'b.admission_date as "admissionDate"',
-                'b.lost_date as "lostDate"',
-                `CASE 
-                    WHEN b.lost_date >= CURRENT_DATE - INTERVAL '1 year' THEN 'Утеряна'
-                    ELSE 'Поступила'
-                END as "status"`
-            ])
-            .where(`(b.admission_date >= CURRENT_DATE - INTERVAL '1 year' 
-                    OR b.lost_date >= CURRENT_DATE - INTERVAL '1 year')`);
-
-        // Фильтр по читальному залу
-        if (filter.pointId && !filter.libraryWide) {
-            baseQuery.innerJoin('points_books', 'pb', 'pb.book_id = b.book_id')
-                    .andWhere('pb.point_id = :pointId', { pointId: filter.pointId });
-        }
-
-        // Фильтр по абоненту
-        if (filter.userId) {
-            baseQuery.innerJoin('rented_books', 'rb', 'rb.book_id = b.book_id')
-                    .andWhere('rb.user_id = :userId', { userId: filter.userId });
-        }
-
-        // Общие фильтры
-        if (filter.author) {
-            baseQuery.andWhere('b.author ILIKE :author', { author: `%${filter.author}%` });
-        }
-
-        if (filter.releaseYear) {
-            baseQuery.andWhere('EXTRACT(YEAR FROM b.release_date) = :releaseYear', 
-                              { releaseYear: filter.releaseYear });
-        }
-
-        if (filter.admissionYear) {
-            baseQuery.andWhere('EXTRACT(YEAR FROM b.admission_date) = :admissionYear', 
-                              { admissionYear: filter.admissionYear });
-        }
-
-        // Запрос для подсчета статистики
-        const countQuery = baseQuery.clone()
-            .select([
-                `SUM(CASE WHEN b.admission_date >= CURRENT_DATE - INTERVAL '1 year' THEN 1 ELSE 0 END) as "received"`,
-                `SUM(CASE WHEN b.lost_date >= CURRENT_DATE - INTERVAL '1 year' THEN 1 ELSE 0 END) as "lost"`
-            ]);
-
-        const [books, counts] = await Promise.all([
-            baseQuery.getRawMany<BookStatResultDto>(),
-            countQuery.getRawOne<{ received: string, lost: string }>()
-        ]);
-
-        return {
-            books,
-            totalReceived: parseInt(counts?.received || '0', 10),
-            totalLost: parseInt(counts?.lost || '0', 10)
-        };
-    }
-
     async createRentedBook(rentedBookData: {
         userId: number;
         bookId: number;
@@ -351,6 +294,66 @@ export abstract class AuthorizedSession extends BaseSession {
 
     async deleteRentedBook(userId: number, bookId: number, pointId: number): Promise<number> {
         return this.delete(RentedBook, { userId, bookId, pointId });
+    }
+
+    async changeRentedBookStatus(userId: number, pointId: number, bookId: number, statusId: number): Promise<number> {
+        let status: Status;
+        if (statusId !== undefined) {
+            status = await AppDataSource.getRepository(Status).findOneBy({statusId});
+            if (!status) return 1;
+        }
+
+        return this.update(RentedBook, {userId, pointId, bookId}, { status });
+    }
+
+    async updateRentedBook(
+        userId: number,
+        bookId: number,
+        pointId: number,
+        updateData: {
+            rentedDate?: Date;
+            expiredDate?: Date;
+            statusId?: number;
+        }
+    ): Promise<number> {
+        try {
+            const updateObj: QueryDeepPartialEntity<RentedBook> = {};
+            
+            if (updateData.rentedDate !== undefined) {
+                updateObj.rentedDate = updateData.rentedDate;
+            }
+            
+            if (updateData.expiredDate !== undefined) {
+                updateObj.expiredDate = updateData.expiredDate;
+            }
+            
+            if (updateData.statusId !== undefined) {
+                const status = await this.find(Status, { statusId: updateData.statusId });
+                if (!status) return 1;
+                updateObj.status = status;
+            }
+
+            // Проверяем, что есть что обновлять
+            if (Object.keys(updateObj).length === 0) {
+                return 1; // Нет полей для обновления
+            }
+
+            const result = await AppDataSource.getRepository(RentedBook)
+                .createQueryBuilder()
+                .update(RentedBook)
+                .set(updateObj) // Явное указание значений для обновления
+                .where("userId = :userId AND bookId = :bookId AND pointId = :pointId", {
+                    userId,
+                    bookId,
+                    pointId
+                })
+                .execute();
+
+            return result.affected ? 0 : 1;
+        } catch (error) {
+            console.error('Update RentedBook error:', error);
+            return 1;
+        }
     }
 
     abstract destroy(): Promise<void>;

@@ -70,7 +70,7 @@ export class RoleController {
         }
 
         const adminSession = <AdminSession> req.session;
-        const result = await adminSession.deleteRole(Number.parseInt(req.params.roleId));
+        const result = await adminSession.deleteRole(Number(req.params.roleId));
         if (result == 1) {
             res.status(401).json({ message: 'Request failed' }).send();
             return;
@@ -85,7 +85,7 @@ export class RoleController {
         }
         
         const adminSession = <AdminSession> req.session;
-        const result = await adminSession.updateRole(Number.parseInt(req.params.roleId), req.body.roleName);
+        const result = await adminSession.updateRole(Number(req.params.roleId), req.body.roleName);
         if (result == 1) {
             res.status(401).json({ message: 'Request failed' }).send();
             return;

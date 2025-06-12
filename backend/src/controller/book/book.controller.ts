@@ -36,7 +36,8 @@ export class BookController {
                 admissionDate: new Date(req.body.admissionDate),
                 cost: req.body.cost,
                 fromAnotherLib: req.body.fromAnotherLib,
-                lostDate: req.body.lostDate ? new Date(req.body.lostDate) : undefined
+                lostDate: req.body.lostDate ? new Date(req.body.lostDate) : undefined,
+                pointId: req.query.pointId ? Number(req.query.pointId) : undefined
             });
 
             if (result !== 0) {
@@ -68,7 +69,8 @@ export class BookController {
                 minCost: req.query.minCost ? Number(req.query.minCost) : undefined,
                 maxCost: req.query.maxCost ? Number(req.query.maxCost) : undefined,
                 fromAnotherLib: req.query.fromAnotherLib ? req.query.fromAnotherLib === 'true' : undefined,
-                isLost: req.query.isLost ? req.query.isLost === 'true' : undefined
+                isLost: req.query.isLost ? req.query.isLost === 'true' : undefined,
+                pointId: req.query.pointId ? Number(req.query.pointId) : undefined
             });
             
             res.json(books);
@@ -114,7 +116,8 @@ export class BookController {
                 admissionDate: req.body.admissionDate ? new Date(req.body.admissionDate) : undefined,
                 cost: req.body.cost,
                 fromAnotherLib: req.body.fromAnotherLib,
-                lostDate: req.body.lostDate === null ? null : req.body.lostDate ? new Date(req.body.lostDate) : undefined
+                lostDate: req.body.lostDate === null ? null : req.body.lostDate ? new Date(req.body.lostDate) : undefined,
+                pointId: req.query.pointId ? Number(req.query.pointId) : undefined
             });
 
             if (result !== 0) {
@@ -206,6 +209,27 @@ export class BookController {
         } catch (error) {
             res.status(500).json({
                 message: error instanceof Error ? error.message : 'Get popular books error'
+            });
+        }
+    }
+    
+    async getBookStats(req: AuthRequest, res: Response) {
+        if (this.checkAvailableRoles(req.session) > 0) {
+            return res.status(403).json({ message: 'Forbidden: Admin access required' });
+        }
+
+        try {
+            const session = <SuperuserSession> req.session;
+            const result = await session.getBookStats(req.body);
+            
+            if (result == null) {
+                return res.status(400).json({ message: 'Get book stats failed' });
+            }
+            
+            res.json(result);
+        } catch (error) {
+            res.status(500).json({
+                message: error instanceof Error ? error.message : 'Get book stats error'
             });
         }
     }

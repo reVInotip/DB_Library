@@ -88,7 +88,7 @@ export class FacultyController {
         }
 
         try {
-            const id = parseInt(req.params.id);
+            const id = Number(req.params.id);
             const adminSession = <AdminSession> req.session;
             const result = await adminSession.updateFaculty(id, req.body.facultyName);
             
@@ -110,7 +110,7 @@ export class FacultyController {
         }
         
         try {
-            const id = parseInt(req.params.id);
+            const id = Number(req.params.id);
             const adminSession = <AdminSession> req.session;
             const result = await adminSession.deleteFaculty(id);
             

@@ -96,6 +96,62 @@ export class RentedBookController {
             });
         }
     }
+
+    async changeStatus(req: AuthRequest, res: Response) {
+        if (this.checkWorkerAccess(req.session) > 0) {
+            return res.status(403).json({ message: 'Forbidden: Admin access required' });
+        }
+
+        try {
+            const adminSession = <AuthorizedSession> req.session;
+            const result = await adminSession.changeRentedBookStatus(
+                Number(req.params.userId),
+                Number(req.params.bookId),
+                Number(req.params.pointId),
+                Number(req.body.statusId)
+            );
+            
+            if (result !== 0) {
+                return res.status(400).json({ message: 'Failed to change rented book status' });
+            }
+            
+            res.json({ message: 'Change rented book status successfully' });
+        } catch (error) {
+            res.status(500).json({
+                message: error instanceof Error ? error.message : 'Failed to change rented book status'
+            });
+        }
+    }
+
+    async update(req: AuthRequest, res: Response) {
+        if (this.checkWorkerAccess(req.session) > 0) {
+            return res.status(403).json({ message: 'Forbidden: Admin access required' });
+        }
+
+        try {
+            const adminSession = <AuthorizedSession> req.session;
+            const result = await adminSession.updateRentedBook(
+                Number(req.params.userId),
+                Number(req.params.bookId),
+                Number(req.params.pointId),
+                {
+                    rentedDate: req.body.rentedDate === null ? null : req.body.rentedDate ? new Date(req.body.rentedDate) : undefined,
+                    expiredDate: req.body.expiredDate === null ? null : req.body.expiredDate ? new Date(req.body.expiredDate) : undefined,
+                    statusId: req.body.statusId
+                }
+            );
+            
+            if (result !== 0) {
+                return res.status(400).json({ message: 'Failed to update rented book' });
+            }
+            
+            res.json({ message: 'Change rented book status successfully' });
+        } catch (error) {
+            res.status(500).json({
+                message: error instanceof Error ? error.message : 'Failed to update rented book'
+            });
+        }
+    }
 }
 
 export const rentedBookController = new RentedBookController(manager);

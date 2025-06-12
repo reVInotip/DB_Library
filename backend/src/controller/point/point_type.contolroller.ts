@@ -84,7 +84,7 @@ export class PointTypeController {
         }
 
         try {
-            const id = parseInt(req.params.id);
+            const id = Number(req.params.id);
             const adminSession = <AdminSession> req.session;
             const result = await adminSession.updatePointType(id, req.body.typeName);
             
@@ -106,7 +106,7 @@ export class PointTypeController {
         }
         
         try {
-            const id = parseInt(req.params.id);
+            const id = Number(req.params.id);
             const adminSession = <AdminSession> req.session;
             const result = await adminSession.deletePointType(id);
             

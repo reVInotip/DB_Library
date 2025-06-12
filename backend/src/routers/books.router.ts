@@ -8,8 +8,11 @@ const router = express.Router();
 router.get('/rented', authController.authenticateJWT, rentedBookController.find.bind(rentedBookController));
 router.post('/rented', authController.authenticateJWT, rentedBookController.create.bind(rentedBookController));
 router.delete('/rented/:userId/:bookId/:pointId', authController.authenticateJWT, rentedBookController.delete.bind(rentedBookController));
+router.patch('/rented/:userId/:bookId/:pointId', authController.authenticateJWT, rentedBookController.changeStatus.bind(rentedBookController));
+router.put('/rented/:userId/:bookId/:pointId', authController.authenticateJWT, rentedBookController.update.bind(rentedBookController));
 
 router.get('/popular', authController.authHook, bookController.getPopularBooks.bind(bookController));
+router.get('/stats', authController.authenticateJWT, bookController.getBookStats.bind(bookController));
 
 router.put('/', authController.authenticateJWT, bookController.find.bind(bookController));
 router.get('/:id', authController.authenticateJWT, bookController.getById.bind(bookController));

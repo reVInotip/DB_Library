@@ -84,7 +84,7 @@ export class TitleController {
         }
 
         try {
-            const id = parseInt(req.params.id);
+            const id = Number(req.params.id);
             const adminSession = <AdminSession> req.session;
             const result = await adminSession.updateTitle(id, req.body.titleName);
             
@@ -106,7 +106,7 @@ export class TitleController {
         }
         
         try {
-            const id = parseInt(req.params.id);
+            const id = Number(req.params.id);
             const adminSession = <AdminSession> req.session;
             const result = await adminSession.deleteTitle(id);
             

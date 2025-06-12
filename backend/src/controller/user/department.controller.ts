@@ -84,7 +84,7 @@ export class DepartmentController {
         }
 
         try {
-            const id = parseInt(req.params.id);
+            const id = Number(req.params.id);
             const adminSession = <AdminSession> req.session;
             const result = await adminSession.updateDepartment(id, req.body.departmentName);
             
@@ -106,7 +106,7 @@ export class DepartmentController {
         }
         
         try {
-            const id = parseInt(req.params.id);
+            const id = Number(req.params.id);
             const adminSession = <AdminSession> req.session;
             const result = await adminSession.deleteDepartment(id);
             

@@ -16,13 +16,12 @@ export class ReadingPoint {
     @Column()
     address: string;
 
-    @ManyToMany(() => Book)
-    @JoinTable()
-    books: Book[];
+    @OneToMany(() => Book, book => book.point, { nullable: true })
+    books?: Book[];
 
-    @OneToMany(() => RentedBook, rentedBook => rentedBook.book, { nullable: true })
+    @OneToMany(() => RentedBook, rentedBook => rentedBook.point, { nullable: true })
     rentedBooks?: RentedBook[];
 
-    @OneToMany(() => PointUser, point => point.user, { nullable: true })
+    @OneToMany(() => PointUser, point => point.readingPoint, { nullable: true })
     users?: PointUser[];
 }

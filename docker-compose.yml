@@ -42,6 +42,18 @@ services:
       - 77.88.8.8
     depends_on:
       - postgres
+      - migrations
+    
+  migrations:
+    depends_on:
+      - postgres
+    build: ./backend
+    command: "npm run automigrate"
+    environment:
+      - PORT_DB=${PG_PORT}
+      - USERNAME=${PG_USER}
+      - PASSWORD=${PG_PASSWORD}
+      - DATABASE=${PG_DATABASE}
 
 volumes:
   postgres:
