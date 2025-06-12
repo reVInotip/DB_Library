@@ -1,4 +1,4 @@
-import { In, Not, IsNull, Between, FindOptionsWhere } from "typeorm";
+import { In, Not, IsNull, Between, FindOptionsWhere, LessThanOrEqual } from "typeorm";
 import { DebtorFilterDto, DebtorsWithCountDto } from "../../dto/debtor.dto";
 import { UserInfoDto, ReadersWithCountDto } from "../../dto/user_info.dto";
 import AppDataSource from "../data-source";
@@ -17,6 +17,7 @@ import { Status } from "../entities/books/status";
 import { User } from "../entities/user/user";
 import { ReadingPointStats } from "../../dto/reading_point.dto";
 import { Orders } from "../entities/books/orders";
+import { format, startOfMonth, subMonths, subYears } from "date-fns";
 
 export abstract class SuperuserSession extends AuthorizedSession {
     constructor(userId: number, role: RoleType, token: string, expiresAt: Date) {
@@ -590,6 +591,183 @@ export abstract class SuperuserSession extends AuthorizedSession {
         return {
             books: orders.map(order => order.book),
             totalCount
+        };
+    }
+
+    async banUser(userId: number): Promise<number> {
+        return this.update(User, { userId: userId }, { bannedDate: new Date() });
+    }
+
+    async setUserBannedDate(userId: number, bannedDate: Date): Promise<number> {
+        return this.update(User, { userId: userId }, { bannedDate: bannedDate });
+    }
+
+    async unbanUser(userId: number): Promise<number> {
+        return this.update(User, { userId: userId }, { bannedDate: null });
+    }
+
+    async getBannedUsersStatisticsDetailed(filters: {
+        facultyId?: number;
+        departmentId?: number;
+        course?: number;
+        groupNumber?: number;
+        roleId?: number;
+    }): Promise<Array<Student | Teacher>> {
+        const twoMonthsAgo = subMonths(new Date(), 2);
+
+        // Базовые условия для забаненных пользователей
+        const baseConditions = {
+            bannedDate: LessThanOrEqual(twoMonthsAgo)
+        };
+
+        // Создаем запросы для студентов и преподавателей
+        const studentQuery = AppDataSource.createQueryBuilder(Student, 'student')
+            .leftJoinAndSelect('student.faculty', 'faculty')
+            .leftJoinAndSelect('student.role', 'role')
+            .where({ ...baseConditions });
+
+        const teacherQuery = AppDataSource.createQueryBuilder(Teacher, 'teacher')
+            .leftJoinAndSelect('teacher.department', 'department')
+            .leftJoinAndSelect('teacher.role', 'role')
+            .where({ ...baseConditions });
+
+        // Применяем фильтры
+        if (filters.facultyId) {
+            studentQuery.andWhere('student.facultyId = :facultyId', { facultyId: filters.facultyId });
+        }
+
+        if (filters.departmentId) {
+            teacherQuery.andWhere('teacher.departmentId = :departmentId', { departmentId: filters.departmentId });
+        }
+
+        if (filters.course) {
+            studentQuery.andWhere('student.course = :course', { course: filters.course });
+        }
+
+        if (filters.groupNumber) {
+            studentQuery.andWhere('student.groupNumber = :groupNumber', { groupNumber: filters.groupNumber });
+        }
+
+        if (filters.roleId) {
+            studentQuery.andWhere('student.roleId = :roleId', { roleId: filters.roleId });
+            teacherQuery.andWhere('teacher.roleId = :roleId', { roleId: filters.roleId });
+        }
+
+        // Если тип пользователя не указан, возвращаем и студентов и преподавателей
+        const [students, teachers] = await Promise.all([
+            studentQuery.getMany(),
+            teacherQuery.getMany()
+        ]);
+
+        return [...students, ...teachers];
+    }
+
+    async getEleminationReaders(options: {
+        period: 'month' | 'semester' | 'year';
+        pointId?: number;
+        facultyId?: number;
+        departmentId?: number;
+        course?: number;
+        groupNumber?: number;
+        roleId?: number;
+        action: 'new' | 'eliminated' | 'both';
+    }): Promise<{
+        total: number;
+        users: Array<User & { student?: Student; teacher?: Teacher }>;
+    }> {        
+        // Определяем временной период
+        let startDate: Date;
+        const endDate = new Date();
+        
+        switch (options.period) {
+            case 'month': startDate = subMonths(endDate, 1); break;
+            case 'semester': startDate = subMonths(endDate, 6); break;
+            case 'year': startDate = subYears(endDate, 1); break;
+            default: startDate = subMonths(endDate, 1);
+        }
+
+        // Преобразуем даты в формат БД (YYYY-MM-DD) для корректного сравнения
+        const dbStartDate = format(startDate, 'yyyy-MM-dd');
+        const dbEndDate = format(endDate, 'yyyy-MM-dd');
+
+        // Базовые условия для даты (используем строки в формате БД)
+        const dateCondition = options.action === 'new' 
+            ? `pu.registerDate BETWEEN '${dbStartDate}' AND '${dbEndDate}'`
+            : options.action === 'eliminated' 
+                ? `pu.eleminationDate BETWEEN '${dbStartDate}' AND '${dbEndDate}'`
+                : `(pu.registerDate BETWEEN '${dbStartDate}' AND '${dbEndDate}' OR 
+                pu.eleminationDate BETWEEN '${dbStartDate}' AND '${dbEndDate}')`;
+
+
+            // Основной запрос для PointUser
+        const pointUsersQuery = AppDataSource.createQueryBuilder(PointUser, 'pu')
+            .innerJoinAndSelect('pu.user', 'user')
+            .leftJoinAndSelect('user.role', 'role')
+            .where(dateCondition);
+
+        // Применяем общие фильтры
+        if (options.pointId) {
+            pointUsersQuery.andWhere('pu.pointId = :pointId', { pointId: options.pointId });
+        }
+        if (options.roleId) {
+            pointUsersQuery.andWhere('user.roleId = :roleId', { roleId: options.roleId });
+        }
+
+        // Получаем pointUsers
+        const pointUsers = await pointUsersQuery.getMany();
+        const userIds = pointUsers.map(pu => pu.user.userId);
+
+        if (userIds.length === 0) {
+            return { total: 0, users: [] };
+        }
+
+        // Получаем студентов и преподавателей отдельными запросами
+        const [students, teachers] = await Promise.all([
+            AppDataSource.getRepository(Student).find({ 
+                where: { userId: In(userIds) },
+                relations: ['faculty']
+            }),
+            AppDataSource.getRepository(Teacher).find({
+                where: { userId: In(userIds) },
+                relations: ['department']
+            })
+        ]);
+
+        // Применяем дополнительные фильтры
+        const filteredStudents = students.filter(s => {
+            return (!options.facultyId || s.faculty.facultyId === options.facultyId) &&
+                (!options.course || s.course === options.course) &&
+                (!options.groupNumber || s.groupNumber === options.groupNumber);
+        });
+
+        const filteredTeachers = teachers.filter(t => {
+            return !options.departmentId || t.department.departmentId === options.departmentId;
+        });
+
+        // Собираем результат
+        const resultUsers = pointUsers.map(pu => {
+            const user = pu.user;
+            const student = students.find(s => s.userId === user.userId);
+            const teacher = teachers.find(t => t.userId === user.userId);
+
+            return {
+                ...user,
+                student,
+                teacher
+            };
+        }).filter(user => {
+            if (user.student) {
+                return filteredStudents.some(s => s.userId === user.userId);
+            }
+            if (user.teacher) {
+                return filteredTeachers.some(t => t.userId === user.userId);
+            }
+            return false;
+        });
+
+        return {
+            total: resultUsers.length,
+            users: resultUsers
         };
     }
 }

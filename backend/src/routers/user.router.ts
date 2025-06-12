@@ -47,6 +47,10 @@ router.put('/debtors', authController.authenticateJWT, userController.getDebtors
 router.post('/', authController.authenticateJWT, userController.create.bind(userController));
 router.get('/', authController.authenticateJWT, userController.getAll.bind(userController));
 router.put('/', authController.authenticateJWT, userController.getBySomething.bind(userController));
+router.patch('/ban/:id', authController.authenticateJWT, userController.banUser.bind(userController));
+router.put('/ban/:id', authController.authenticateJWT, userController.setUserBannedDate.bind(userController));
+router.get('/ban', authController.authenticateJWT, userController.getBannedUsersStats.bind(userController));
+router.patch('/unban/:id', authController.authenticateJWT, userController.unbanUser.bind(userController));
 router.put('/:id', authController.authenticateJWT, userController.update.bind(userController));
 router.delete('/:id', authController.authenticateJWT, userController.delete.bind(userController));
 

@@ -21,6 +21,7 @@ router.get('/order/interLib', authController.authenticateJWT, ordersController.g
 
 router.get('/popular', authController.authHook, bookController.getPopularBooks.bind(bookController));
 router.get('/stats', authController.authenticateJWT, bookController.getBookStats.bind(bookController));
+router.get('/count/:id', authController.authenticateJWT, bookController.getBookWithCopiesCount.bind(bookController));
 
 router.put('/', authController.authenticateJWT, bookController.find.bind(bookController));
 router.get('/:id', authController.authenticateJWT, bookController.getById.bind(bookController));

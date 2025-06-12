@@ -2,6 +2,7 @@ import manager, { SessionManager } from "../../model/session.manager";
 import { AdminSession } from "../../model/session/admin.session";
 import { AuthorizedSession } from "../../model/session/authorized.assession";
 import { ISession } from "../../model/session/session.interface";
+import { SuperuserSession } from "../../model/session/superuser.asession";
 import { AuthRequest } from "../auth/auth_request";
 import { Response } from 'express';
 
@@ -13,11 +14,17 @@ export class PointUserController {
     }
 
     private checkAccess(session: ISession): number {
-        return session.role != 'unauth' ? 0 : 1;
+        if (session.role == 'admin' || session.role == 'worker') {
+            return 0;
+        } else if (session.role == 'student' || session.role == 'teacher') {
+            return 1;
+        }
+
+        return 2;
     }
 
     async create(req: AuthRequest, res: Response) {
-        if (this.checkAccess(req.session) > 0) {
+        if (this.checkAccess(req.session) > 1) {
             return res.status(403).json({ message: 'Forbidden: Admin access required' });
         }
 
@@ -43,7 +50,7 @@ export class PointUserController {
     }
 
     async getById(req: AuthRequest, res: Response) {
-        if (this.checkAccess(req.session) > 0) {
+        if (this.checkAccess(req.session) > 1) {
             return res.status(403).json({ message: 'Forbidden: Admin access required' });
         }
 
@@ -67,7 +74,7 @@ export class PointUserController {
     }
 
     async find(req: AuthRequest, res: Response) {
-        if (this.checkAccess(req.session) > 0) {
+        if (this.checkAccess(req.session) > 1) {
             return res.status(403).json({ message: 'Forbidden: Admin access required' });
         }
 
@@ -90,7 +97,7 @@ export class PointUserController {
     }
 
     async update(req: AuthRequest, res: Response) {
-        if (this.checkAccess(req.session) > 0) {
+        if (this.checkAccess(req.session) > 1) {
             return res.status(403).json({ message: 'Forbidden: Admin access required' });
         }
 
@@ -119,7 +126,7 @@ export class PointUserController {
     }
 
     async deactivate(req: AuthRequest, res: Response) {
-        if (this.checkAccess(req.session) > 0) {
+        if (this.checkAccess(req.session) > 1) {
             return res.status(403).json({ message: 'Forbidden: Admin access required' });
         }
 
@@ -143,7 +150,7 @@ export class PointUserController {
     }
 
     async activate(req: AuthRequest, res: Response) {
-        if (this.checkAccess(req.session) > 0) {
+        if (this.checkAccess(req.session) > 1) {
             return res.status(403).json({ message: 'Forbidden: Admin access required' });
         }
 
@@ -167,7 +174,7 @@ export class PointUserController {
     }
 
     async delete(req: AuthRequest, res: Response) {
-        if (this.checkAccess(req.session) > 0) {
+        if (this.checkAccess(req.session) > 1) {
             return res.status(403).json({ message: 'Forbidden: Admin access required' });
         }
 
@@ -186,6 +193,36 @@ export class PointUserController {
         } catch (error) {
             res.status(500).json({
                 message: error instanceof Error ? error.message : 'PointUser deletion error'
+            });
+        }
+    }
+
+    async getEleminationReaders(req: AuthRequest, res: Response) {
+        if (this.checkAccess(req.session) > 0) {
+            return res.status(401).json({ message: 'Access denied' });
+        }
+
+        try {
+            const session = <SuperuserSession> req.session;
+            const result = await session.getEleminationReaders({
+                period: req.body.period,
+                pointId: req.body.pointId ? Number(req.body.pointId) : undefined,
+                facultyId: req.body.facultyId ? Number(req.body.facultyId) : undefined,
+                departmentId: req.body.departmentId ? Number(req.body.departmentId) : undefined,
+                course: req.body.course ? Number(req.body.course) : undefined,
+                groupNumber: req.body.groupNumber ? Number(req.body.groupNumber) : undefined,
+                roleId: req.body.roleId ? Number(req.body.roleId) : undefined,
+                action: req.body.action
+            });
+
+            if (result == null) {
+                return res.status(400).json({ message: 'Get failed' });
+            }
+            
+            res.json(result);
+        } catch (error) {
+            res.status(500).json({
+                message: error instanceof Error ? error.message : 'get error'
             });
         }
     }

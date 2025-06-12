@@ -26,6 +26,7 @@ router.put('/pointUsers/:userId/:pointId', authController.authenticateJWT, point
 router.patch('/pointUsers/:userId/:pointId/deactivate', authController.authenticateJWT, pointUserController.deactivate.bind(pointUserController));
 router.patch('/pointUsers/:userId/:pointId/activate', authController.authenticateJWT, pointUserController.activate.bind(pointUserController));
 router.delete('/pointUsers/:userId/:pointId', authController.authenticateJWT, pointUserController.delete.bind(pointUserController));
+router.get('/pointUsers/eleminate', authController.authenticateJWT, pointUserController.getEleminationReaders.bind(pointUserController));
 
 router.get('/stats', authController.authenticateJWT, readingPointController.getReadingPointsStats.bind(readingPointController));
 router.post('/', authController.authenticateJWT, readingPointController.create.bind(readingPointController));

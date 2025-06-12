@@ -433,6 +433,49 @@ export abstract class AuthorizedSession extends BaseSession {
         }
     }
 
+    async getBookWithCopiesCount(bookId: number, pointId?: number) {
+        try {
+            // 1. Сначала находим книгу по ID
+            const originalBook = await this.find(Book, { bookId } as FindOptionsWhere<Book>);
+            
+            if (!originalBook) {
+                return null;
+            }
+
+            // 2. Создаём условия для поиска экземпляров
+            const whereConditions: FindOptionsWhere<Book> = {
+                title: originalBook.title,
+                author: originalBook.author,
+                releaseDate: originalBook.releaseDate,
+                lostDate: null // только непропавшие книги
+            };
+
+            // 3. Добавляем фильтр по точке, если нужно
+            if (pointId !== undefined) {
+                whereConditions.point = { pointId };
+            }
+
+            // 4. Получаем все экземпляры книги
+            const copies = await this.getAll(Book, ['point'], {
+                where: whereConditions
+            });
+
+            return {
+                bookInfo: {
+                    title: originalBook.title,
+                    author: originalBook.author,
+                    year: originalBook.releaseDate,
+                    originalBookId: originalBook.bookId
+                },
+                copiesCount: copies.length,
+                copies: pointId ? undefined : copies // возвращаем список, если не фильтровали по точке
+            };
+        } catch (error) {
+            console.error('Error in getBookWithCopiesCount:', error);
+            throw error;
+        }
+    }
+
     abstract destroy(): Promise<void>;
     abstract refresh(): Promise<void>;
     //abstract createNewUser(userData: UserDto): Promise<[number, string]>;

@@ -19,7 +19,7 @@ export class BookController {
             return 1;
         }
 
-        return 1;
+        return 2;
     }
 
     async create(req: AuthRequest, res: Response) {
@@ -37,7 +37,7 @@ export class BookController {
                 cost: req.body.cost,
                 fromAnotherLib: req.body.fromAnotherLib,
                 lostDate: req.body.lostDate ? new Date(req.body.lostDate) : undefined,
-                pointId: req.query.pointId ? Number(req.query.pointId) : undefined
+                pointId: req.body.pointId ? Number(req.body.pointId) : undefined
             });
 
             if (result !== 0) {
@@ -230,6 +230,30 @@ export class BookController {
         } catch (error) {
             res.status(500).json({
                 message: error instanceof Error ? error.message : 'Get book stats error'
+            });
+        }
+    }
+
+    async getBookWithCopiesCount(req: AuthRequest, res: Response) {
+        if (this.checkAvailableRoles(req.session) > 1) {
+            return res.status(403).json({ message: 'Forbidden: Admin access required' });
+        }
+
+        try {
+            const session = <AuthorizedSession> req.session;
+            const result = await session.getBookWithCopiesCount(
+                Number(req.params.id),
+                req.body.pointId ? Number(req.body.pointId) : undefined
+            );
+            
+            if (result == null) {
+                return res.status(400).json({ message: 'Get book failed' });
+            }
+            
+            res.json(result);
+        } catch (error) {
+            res.status(500).json({
+                message: error instanceof Error ? error.message : 'Get book error'
             });
         }
     }

@@ -26,6 +26,11 @@ export class SessionManager {
     async init() {
         // create init admin session
         const initSession: AdminSession = this.createInitSession();
+        const r = await initSession.findRole(adminRoleName);
+        if (r) {
+            return;
+        }
+        
         await initSession.createRole(adminRoleName);
 
         const users = await initSession.getAllUsers();

@@ -145,6 +145,103 @@ export class UserController {
             });
         }
     }
+
+    async banUser(req: AuthRequest, res: Response) {
+        if (this.checkAvailableRoles(req.session) > 1) {
+            return res.status(401).json({ message: 'Access denied' });
+        }
+
+        try {
+            const session = <SuperuserSession> req.session;
+            const result = await session.banUser(
+                req.params.id ? Number(req.params.id) : undefined
+            );
+
+            if (result == null) {
+                return res.status(400).json({ message: 'Ban failed' });
+            }
+            
+            res.json(result);
+        } catch (error) {
+            res.status(500).json({
+                message: error instanceof Error ? error.message : 'ban error'
+            });
+        }
+    }
+
+    async setUserBannedDate(req: AuthRequest, res: Response) {
+        if (this.checkAvailableRoles(req.session) > 1) {
+            return res.status(401).json({ message: 'Access denied' });
+        }
+
+        try {
+            const session = <SuperuserSession> req.session;
+            const result = await session.setUserBannedDate(
+                req.params.id ? Number(req.params.id) : undefined,
+                req.body.date ? new Date(req.body.date) : undefined
+            );
+
+            if (result == null) {
+                return res.status(400).json({ message: 'Ban failed' });
+            }
+            
+            res.json(result);
+        } catch (error) {
+            res.status(500).json({
+                message: error instanceof Error ? error.message : 'ban error'
+            });
+        }
+    }
+
+    async unbanUser(req: AuthRequest, res: Response) {
+        if (this.checkAvailableRoles(req.session) > 1) {
+            return res.status(401).json({ message: 'Access denied' });
+        }
+
+        try {
+            const session = <SuperuserSession> req.session;
+            const result = await session.unbanUser(
+                req.params.id ? Number(req.params.id) : undefined
+            );
+
+            if (result == null) {
+                return res.status(400).json({ message: 'Unban failed' });
+            }
+            
+            res.json(result);
+        } catch (error) {
+            res.status(500).json({
+                message: error instanceof Error ? error.message : 'unban error'
+            });
+        }
+    }
+
+    async getBannedUsersStats(req: AuthRequest, res: Response) {
+        if (this.checkAvailableRoles(req.session) > 1) {
+            return res.status(401).json({ message: 'Access denied' });
+        }
+
+        try {
+            const session = <SuperuserSession> req.session;
+            const result = await session.getBannedUsersStatisticsDetailed({
+                facultyId: req.body.facultyId ? Number(req.body.facultyId) : undefined,
+                departmentId: req.body.departmentId ? Number(req.body.departmentId) : undefined,
+                course: req.body.course ? Number(req.body.course) : undefined,
+                groupNumber: req.body.groupNumber ? Number(req.body.groupNumber) : undefined,
+                roleId: req.body.roleId ? Number(req.body.roleId) : undefined
+            });
+
+            if (result == null) {
+                return res.status(400).json({ message: 'Get failed' });
+            }
+            
+            res.json(result);
+        } catch (error) {
+            res.status(500).json({
+                message: error instanceof Error ? error.message : 'get error'
+            });
+        }
+    }
 }
 
 export const userController: UserController = new UserController(manager);
